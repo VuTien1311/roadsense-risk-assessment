@@ -1,50 +1,96 @@
-# RoadScene-FailAware
+<h1 align="center">RoadScene-FailAware</h1>
 
-Code and image-ID manifests for the paper **"Conservative Road-Scene Risk Assessment via
-Fail-Aware Multi-Model Fusion"** (ICoCSETI 2026) by Pham Hoang Bach, Vu Gia Tien,
-Trinh Quang Tien and Cao Van Mai (Faculty of Artificial Intelligence, FPT University).
+<p align="center">
+  <b>Conservative Road-Scene Risk Assessment via Fail-Aware Multi-Model Fusion</b><br>
+  Pham Hoang Bach · Vu Gia Tien · Trinh Quang Tien · Cao Van Mai<br>
+  <i>Faculty of Artificial Intelligence, FPT University · ICoCSETI 2026</i>
+</p>
 
-A single front-facing image is analysed by three frozen pretrained models,
-**YOLO11x-seg + HybridNets-D3 + Depth Anything V2 ViT-L**, and an auditable, fail-aware
-fusion layer turns their outputs into a conservative advisory
-(`CLEAR / MONITOR / SLOW / BRAKE / STOP`) with one audit record per object.
+<p align="center">
+  <a href="https://github.com/VuTien1311/roadsense-risk-assessment/actions/workflows/tests.yml"><img alt="tests" src="https://github.com/VuTien1311/roadsense-risk-assessment/actions/workflows/tests.yml/badge.svg"></a>
+  <img alt="python 3.11" src="https://img.shields.io/badge/python-3.11-blue">
+  <img alt="pytorch 2.7.1" src="https://img.shields.io/badge/pytorch-2.7.1-ee4c2c">
+  <img alt="dataset BDD100K" src="https://img.shields.io/badge/dataset-BDD100K-2a78d6">
+  <img alt="inference only" src="https://img.shields.io/badge/scope-inference%20only-lightgrey">
+</p>
 
-**Inference only.** Nothing is trained or fine-tuned here. Research code, not for vehicle control.
+<p align="center">
+  <img src="docs/assets/qualitative.png" width="100%" alt="Six hard-set cases with system outputs, BDD100K annotations and the annotated ego lane">
+</p>
 
-![Synthetic layout preview: original, overlay, relative depth](docs/assets/layout_demo.png)
+A single front-facing image is analysed by three frozen pretrained models and an auditable,
+**fail-aware fusion layer** that turns their outputs into a conservative advisory
+(`CLEAR / MONITOR / SLOW / BRAKE / STOP`) with one audit record per object. Weak evidence can add
+caution, but it can never create an object or justify a severe advisory.
 
-*The screenshot shows the three-panel output layout on synthetic test data; it is not a model
-prediction or an experimental result.*
+> **Inference only.** Nothing is trained or fine-tuned here. Research code, not for vehicle control.
 
-| Component | Purpose | Fixed paper profile |
+## Contents
+
+- [How it works](#how-it-works)
+- [Results](#results)
+- [Quick start](#quick-start)
+- [Reproducing the paper](#reproducing-the-paper)
+- [Repository layout](#repository-layout)
+- [Limitations](#limitations)
+- [Citation](#citation)
+
+## How it works
+
+<p align="center">
+  <img src="docs/assets/pipeline.png" width="80%" alt="Pipeline: three perception models, reasoning stages, fail-aware fusion with severity gates, advisory">
+</p>
+
+| Component | Role | Paper profile |
 |---|---|---|
-| YOLO11x-seg | Object boxes, classes and instance masks | 960 px, confidence 0.15, four-pass TTA |
-| HybridNets-D3 | Drivable-road and lane masks | 640 px |
-| Depth Anything V2 ViT-L | Dense relative-depth field | 518 px |
-| Fusion layer | Depth reliability (`STABLE / CHECK / UNCERTAIN`), path relation (`PATH / EDGE / SIDE`), severity gates, depth-only fallback | Relative-depth mode |
+| **YOLO11x-seg** | Object boxes, classes and instance masks | 960 px, confidence 0.15, four-pass TTA |
+| **HybridNets-D3** | Drivable-road and lane masks for the ego corridor | 640 px |
+| **Depth Anything V2 ViT-L** | Dense relative-depth field | 518 px |
+| **Fusion layer** | Scene quality, depth reliability, path relation, severity gates, depth-only fallback | Relative-depth mode |
 
-## Results in the paper
+**Depth reliability.** For every object the relative depth is sampled in three regions of its
+mask. When the regions agree the estimate is `STABLE`; when they disagree (for example a mask that
+leaks into the background) it is kept at `CHECK` or `UNCERTAIN`.
 
-Evaluated against BDD100K annotations on 9,500 validation images (the validation set minus a
-500-image dev subset used only for priors, sensitivity and the operating curve):
+<p align="center">
+  <img src="docs/assets/regions.png" width="62%" alt="Multi-region depth sampling: a STABLE and a CHECK example">
+</p>
+
+**Path relation and gates.** Each object is related to an ego corridor as `PATH`, `EDGE` or
+`SIDE`. Severity gates then cap unsupported outputs: `STOP` needs a close, `STABLE`, in-path object
+with strong detector and scene evidence. When no object is detected and the depth along the
+corridor is not consistent, the fallback raises `CLEAR` to `MONITOR`.
+
+## Results
+
+Evaluated against BDD100K annotations on **9,500 validation images** (the validation set minus a
+500-image dev subset used only for priors, sensitivity and the operating curve).
 
 | Measure (test split) | Value |
 |---|---|
-| Accepted detections with a `STABLE` depth estimate | 84.9 % |
-| False positives, non-`STABLE` vs. `STABLE` estimates | 17.4 % vs. 9.7 % (factor 1.8) |
+| Accepted detections with a `STABLE` depth estimate | **84.9 %** |
+| False positives, non-`STABLE` vs. `STABLE` estimates | 17.4 % vs. 9.7 % (**1.8x**) |
 | Detection precision / recall of relevant road users | 89.1 % / 78.9 % |
-| Unsafe `CLEAR` (occupied ego lane, advisory `CLEAR`) | 11 of 3,250 images |
+| Unsafe `CLEAR` (occupied ego lane, advisory `CLEAR`) | **11 of 3,250** images |
 | Over-caution (`SLOW` or higher on a free ego lane) | 4,799 of 5,844 images |
 | `PATH` precision / recall against the annotated ego lane | 9.2 % / 53.8 % |
 
-The system is conservative at a measured cost: the fixed perspective ego corridor assigns many
-roadside and distant objects to the path. The ablations, the operating curve, the sensitivity and
-perturbation-stability tests, and a supplementary run on the 69,863 annotated train images are
-described in the paper and regenerated by [camera_ready/](camera_ready/README.md).
+The system is conservative **at a measured cost**: the fixed perspective corridor assigns many
+roadside and distant objects to the path. The operating curve below scales all advisory cut-offs
+together; the published setting sits at the conservative end, and a relaxation chosen on the dev
+subset does not transfer to held-out images.
 
-## Quick start - Windows / PowerShell
+<p align="center">
+  <img src="docs/assets/operating_curve.png" width="62%" alt="Operating curve: unsafe CLEAR against over-caution for the dev subset, held-out images and the train split">
+</p>
 
-Requires Python 3.11 and enough memory for all three models.
+Also in the paper: cumulative and leave-one-out ablations on identical network outputs, ±20 %
+threshold sensitivity, stability under six mild perturbations, results by time of day and weather,
+RTX 3050 vs. T4 agreement, and a supplementary run on the 69,863 annotated BDD100K train images.
+
+## Quick start
+
+Windows / PowerShell, Python 3.11.
 
 ```powershell
 py -3.11 -m venv .venv
@@ -53,12 +99,10 @@ py -3.11 -m venv .venv
 ```
 
 The default requirements keep the CUDA 11.8 / PyTorch 2.7.1 recipe; for CPU-only use install
-`requirements-cpu.txt` (slow). `docs/environment_snapshot.txt` is the historical snapshot, not a
-fresh-install guarantee.
+`requirements-cpu.txt` (slow).
 
-### 1. Pretrained weights
-
-Weights are **not bundled** and are ignored by Git:
+**1. Weights** are not bundled and are ignored by Git. See [docs/WEIGHTS.md](docs/WEIGHTS.md) for
+the official sources; the SHA-256 values used in the paper are in `weights_manifest.json`.
 
 ```text
 yolo11x-seg.pt
@@ -66,31 +110,30 @@ hybrid2/weights/hybridnets.pth
 checkpoints/depth_anything_v2_vitl.pth
 ```
 
-See [weight setup](docs/WEIGHTS.md) for the official sources; the SHA-256 values used in the paper
-are in `weights_manifest.json`.
-
-### 2. Run on your images
-
-Place images in `input/`, then double-click **RUN.bat**, or run:
+**2. Run.** Place images in `input/`, then double-click `RUN.bat`, or:
 
 ```powershell
 & .\.venv\Scripts\python.exe run_paper.py input --output-dir outputs\paper
 
-# One image:
+# One image
 & .\.venv\Scripts\python.exe run_paper.py 'input\scene.jpg' --output-dir outputs\paper
 
-# Check the profile without models, GPU or weights:
+# Check the profile without models, GPU or weights
 & .\.venv\Scripts\python.exe run_paper.py --dry-run 'input\scene.jpg'
 
-# Check dependencies and checkpoint hashes; no inference:
+# Check dependencies and checkpoint hashes; no inference
 & .\.venv\Scripts\python.exe run_paper.py --check
 ```
 
-Use **run_paper.py**, not `test3.py` directly: the launcher fixes the paper's model profile.
+Use `run_paper.py`, not `test3.py` directly: the launcher fixes the paper's model profile.
 
-### 3. Outputs
+**3. Outputs.** For `scene.jpg`, `outputs/paper/` receives a three-panel comparison
+(original | overlay | relative depth), the separate images, the raw depth array and a JSON audit
+record. The layout, shown here on synthetic test data (not a model prediction):
 
-For `scene.jpg`, `outputs/paper/` receives:
+<p align="center">
+  <img src="docs/assets/layout_demo.png" width="100%" alt="Synthetic layout preview: original, overlay, relative depth">
+</p>
 
 | File | Contents |
 |---|---|
@@ -104,23 +147,26 @@ Warm colors are nearer and cool colors farther **within the same image**; they a
 
 ## Reproducing the paper
 
-[camera_ready/README.md](camera_ready/README.md) lists the data, the published splits
-(`camera_ready/sets/*_ids.txt` with SHA-256 values in `splits_manifest.json`), the hardware of
-every result and the commands. In short: `harness.py` runs the unmodified pipeline and caches the
-three model outputs per image, `harness.py replay` re-runs only the fusion stage for each ablation,
-`gt_eval.py` scores a run against the BDD100K annotations, and `results.py`, `make_tables.py`,
-`figures.py` and `paper_numbers.py` produce every number, table and figure. BDD100K images and
-labels must be obtained separately under their own terms.
+Everything in the paper is regenerated from [`camera_ready/`](camera_ready/README.md): no number
+is typed by hand.
 
-## Tests
+| Step | Script | What it does |
+|---|---|---|
+| 1 | `harness.py infer` | Runs the unmodified pipeline and caches the three model outputs per image |
+| 2 | `harness.py replay` | Re-runs only the fusion stage for each ablation, on identical network outputs |
+| 3 | `gt_eval.py` | Scores a run against the BDD100K boxes, flags and drivable-area maps |
+| 4 | `results.py` | Aggregates with Wilson intervals, image-cluster bootstrap and exact McNemar tests |
+| 5 | `make_tables.py`, `figures.py`, `paper_numbers.py` | Tables, figures and every number of the paper |
+
+The image IDs of every split are published in `camera_ready/sets/` (dev, test, hard set, 1k subset,
+val_rest, train) with their SHA-256 values in `splits_manifest.json`. BDD100K images and labels
+must be obtained separately under their own terms.
 
 ```powershell
-# Lightweight tests need neither model weights nor a GPU.
+# Lightweight tests need neither model weights nor a GPU
 & .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 & .\.venv\Scripts\python.exe scripts\check_repository.py
 ```
-
-GitHub Actions runs the same syntax, repository-safety and visualization/profile tests.
 
 ## Repository layout
 
@@ -166,4 +212,5 @@ GitHub Actions runs the same syntax, repository-safety and visualization/profile
 The contribution of this repository is the integration and the fail-aware fusion logic, not the
 pretrained architectures. Upstream attribution and component licenses are preserved; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [LICENSE_POLICY.md](LICENSE_POLICY.md).
-No new blanket license is assigned to the combined repository.
+No new blanket license is assigned to the combined repository. The example images in the figures
+come from BDD100K and remain under its terms.
