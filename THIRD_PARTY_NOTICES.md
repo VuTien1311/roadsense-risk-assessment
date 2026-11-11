@@ -3,8 +3,7 @@
 - `test3.py`: recovered pre-competition project fusion/inference source.
   Only visualization export was added; model/fusion logic is unchanged.
   The unchanged original is retained in `provenance/test3_original.py`.
-  The original is retained for AST-equivalence testing; hashes are recorded
-  in `REPOSITORY_MANIFEST.json`.
+  The original is retained for AST-equivalence testing.
 - `hybrid2/`: existing local HybridNets source, originally
   https://github.com/datvuthanh/HybridNets . Its original LICENSE and README
   are retained. Encoder code also carries upstream attribution in its files.

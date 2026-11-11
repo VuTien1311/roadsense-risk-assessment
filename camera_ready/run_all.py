@@ -241,8 +241,6 @@ def stage_final():
     stage_summary()
     stage_tables()
     must([PY, str(HERE / "paper_numbers.py")])
-    must([PY, str(HERE / "build_paper.py")])
-    must([PY, str(HERE / "changes_doc.py")])
 
 
 STAGES = {

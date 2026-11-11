@@ -45,6 +45,7 @@ explicit in `paper_config.json`. The PDF does not fully specify those choices.
 & .\.venv\Scripts\python.exe static_training\compare_static_benchmarks.py outputs\run_a outputs\run_b --output outputs\paired_comparison.json
 ```
 
-The included helpers do not implement all requested reviewer ablations or a
-validated COCO-to-BDD class-mapped ground-truth evaluator. Those remain separate
-work. A high internal stable ratio is not proof of detection/depth accuracy.
+These helpers only cover the internal statistics. The ground-truth evaluation, the
+cached-replay ablations, the sensitivity and stability tests and every table and
+figure of the paper are in `camera_ready/` (see `camera_ready/README.md`). A high
+internal stable ratio is not proof of detection/depth accuracy.

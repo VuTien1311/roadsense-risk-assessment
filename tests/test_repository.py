@@ -15,7 +15,7 @@ class RepositoryTests(unittest.TestCase):
                 self.assertTrue((ROOT / link.split("#")[0]).exists(), link)
 
     def test_required_documents_and_licenses(self):
-        for name in (".gitignore", ".gitattributes", "docs/GITHUB_UPLOAD.md", "docs/TEAM_ROLES.md", "docs/WEIGHTS.md", "LICENSE_POLICY.md", "hybrid2/LICENSE", "depth_anything_v2/LICENSE", "RUN.bat", ".github/workflows/tests.yml"):
+        for name in (".gitignore", ".gitattributes", "docs/WEIGHTS.md", "LICENSE_POLICY.md", "hybrid2/LICENSE", "depth_anything_v2/LICENSE", "RUN.bat", ".github/workflows/tests.yml"):
             self.assertTrue((ROOT / name).is_file(), name)
 
     @unittest.skipUnless(shutil.which("git"), "Git not installed")

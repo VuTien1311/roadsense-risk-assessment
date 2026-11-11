@@ -1,7 +1,5 @@
 # Contributing
 
-See `docs/TEAM_ROLES.md` for the proposed three-person split.
-
 Before a pull request:
 
 1. Run `python -m unittest discover -s tests -v`.
@@ -12,4 +10,3 @@ Before a pull request:
 
 If changing inference/fusion, update the reference-provenance documentation and
 the AST-equivalence test intentionally. Do not silently remove a failing test.
-For GitHub uploads, review both staged paths and image/data provenance first.
