@@ -15,10 +15,15 @@ explicit in `paper_config.json`. The PDF does not fully specify those choices.
 - Profile, output round-trip, invalid-depth and three-panel geometry tests passed.
 - The fusion AST matches the recovered original after removing presentation-only
   additions; the original is retained at `provenance/test3_original.py`.
-- Full YOLO11x-seg inference was not run during repository setup because that
-  checkpoint was not locally present. Do not describe it as tested end-to-end.
+- Full YOLO11x-seg inference has been run end to end (November 2026) with the
+  checksummed weights listed in `weights_manifest.json`.
 - Original hard-set IDs and per-image results were not recovered. Historical
-  counts/rates in the supplied paper must not be copied as new measured results.
+  counts/rates in the submitted paper must not be copied as new measured results;
+  the camera-ready numbers come from the 9,500-image test split (BDD100K val minus a
+  500-image dev subset), with the regenerated, published hard set and a random
+  1,000-image subset for stability. Part of the inference ran on a Kaggle T4 with
+  the same pinned software; which GPU produced which result, and the measured
+  RTX 3050 vs T4 agreement, are listed in `camera_ready/README.md`.
 
 ## Rerun procedure
 

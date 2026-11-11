@@ -16,11 +16,12 @@
   "files_staged_or_committed": false,
   "weights_or_dataset_bundled": false,
   "roadscope_edgeadas_or_flood_code_bundled": false,
-  "full_model_inference": "NOT RUN; YOLO11x-seg weight not locally present",
+  "full_model_inference": "RUN 2026-11-08 on RTX 3050 6GB with checksummed YOLO11x-seg, HybridNets-D3, Depth Anything V2 ViT-L (camera_ready/harness.py; byte-identical to run_paper.py)",
   "fresh_full_inference_environment_install": "NOT RUN",
-  "paper_table_reproduction": "UNVERIFIED; original hard-set IDs and outputs absent",
+  "paper_table_reproduction": "Original hard-set IDs remain lost; camera-ready tables are regenerated on the deterministic published hard set and a random 1,000-image standard set (camera_ready/)",
   "demo_image": "Synthetic presentation layout test; not model output",
   "original_fusion_sha256": "38ac6f6cf3e9162ed81eab289f86b733aafce53083a0a3ceda8349a6a3693fa5",
   "current_fusion_sha256": "98a5512f8387247ef8fe5278ba9d26114053c6cab30f95e1b4df3a00d649bb90",
-  "files_before_generated_metadata": 87
+  "files_before_generated_metadata": 87,
+  "camera_ready_evaluation": "BDD100K val ground truth (boxes, occluded/truncated, drivable maps, timeofday/weather); see camera_ready/README.md"
 }

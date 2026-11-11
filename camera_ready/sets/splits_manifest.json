@@ -1,0 +1,31 @@
+{
+  "source": "BDD100K 100k/val",
+  "val_images": 10000,
+  "seed": 20261108,
+  "splits": {
+    "hard": {
+      "count": 100,
+      "ids_sha256": "5d6c11f5bdd1198a14c47fc8e6e21a2e1be9ea16ca3b295d8b3a08a2a765c920"
+    },
+    "dev": {
+      "count": 500,
+      "ids_sha256": "6f301563bf28d1548c18fc9ac214982a00ae485187a56f13676e3de12ae85fce"
+    },
+    "standard": {
+      "count": 1000,
+      "ids_sha256": "5bdb945f9cf8ed38e2f6974a9d637be6cdb859f1a071bbcecc1428f81062b447"
+    },
+    "test": {
+      "count": 9500,
+      "ids_sha256": "af51f530c5d9b3c5e47f3efe01d8efacdb50e2ba75ff112cf1a4f386084cad3a"
+    },
+    "val": {
+      "count": 10000,
+      "ids_sha256": "18358f0cb40fbd10bff62675e9d7f321eb3ef76b58a95705030d0dbad079c9a1"
+    },
+    "val_rest": {
+      "count": 8400,
+      "ids_sha256": "7249b59f376ab580537c9ddc7cf419b5db8d4c53e4f8f799aff36f56978810cd"
+    }
+  }
+}

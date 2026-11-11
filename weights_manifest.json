@@ -4,9 +4,10 @@
     {
       "path": "yolo11x-seg.pt",
       "model": "YOLO11x-seg official pretrained",
-      "local_checkpoint_available_at_export": false,
-      "sha256": null,
-      "source": "https://docs.ultralytics.com/models/yolo11/"
+      "local_checkpoint_available_at_export": true,
+      "sha256": "4e53a5f5fd3ee2ae3361c62169c6bb3ed4ae251dd0e57606e230955aa52d919c",
+      "source": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11x-seg.pt",
+      "bytes": 125090821
     },
     {
       "path": "hybrid2/weights/hybridnets.pth",
@@ -23,6 +24,22 @@
       "bytes": 1341395338,
       "sha256": "a7ea19fa0ed99244e67b624c72b8580b7e9553043245905be58796a608eb9345",
       "source": "https://github.com/DepthAnything/Depth-Anything-V2"
+    }
+  ],
+  "camera_ready_detector_swap": [
+    {
+      "path": "yolo11s-seg.pt",
+      "bytes": 20669228,
+      "sha256": "1caa81c0195412efa411b632bcfb8c184939dddb6ae41f6a80c41b211ff257c3",
+      "source": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11s-seg.pt",
+      "use": "detector-swap ablation only"
+    },
+    {
+      "path": "yolo11m-seg.pt",
+      "bytes": 45400152,
+      "sha256": "eb9a06f63e2206c35d68d839b08c362429ebecf933ad54c1ad68b2fd001c17cf",
+      "source": "Official Ultralytics release (hash matches D:/Paper123 recovery manifest)",
+      "use": "detector-swap ablation only"
     }
   ]
 }

@@ -141,15 +141,20 @@ and experiment review are shared responsibilities.
   Enhancement `auto`, TTA `full`, precision filter `strict` and tile `off` are
   recovered implementation choices not fully specified in the PDF.
 - Exact original 100-image hard-set IDs and original per-image outputs were
-  not recovered. Do not claim the historical paper tables have been reproduced.
-- Local launcher, rendering, syntax and fusion-AST equivalence checks passed.
-  End-to-end YOLO11x-seg inference was not run during repository preparation
-  because the YOLO11x-seg checkpoint was absent locally.
+  not recovered. The camera-ready version therefore regenerates the hard set
+  deterministically and publishes its image IDs; all camera-ready numbers come
+  from that set and from a random 1,000-image standard set
+  (see [camera_ready/README.md](camera_ready/README.md)).
+- End-to-end YOLO11x-seg inference has been run (November 2026) with the
+  checksummed weights in `weights_manifest.json`; cached-replay ablations
+  reproduce the original fusion output byte for byte.
 - Relative depth is not calibrated distance. `STABLE` indicates internal
   agreement, not ground-truth accuracy. No speed, TTC, tracking or steering
   safety is estimated. Advisories must not drive vehicle actuators.
 
-See [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) for the experiment procedure.
+See [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) for the experiment procedure and
+[camera_ready/README.md](camera_ready/README.md) for the ground-truth evaluation,
+ablations, sensitivity, stability and detector-swap experiments of the camera-ready paper.
 
 ## GitHub upload and provenance
 
