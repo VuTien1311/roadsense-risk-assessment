@@ -305,6 +305,7 @@ def run(args):
     load_models = args.mode == "infer"
     if args.mode == "replay" or args.no_vis or args.variants:
         test3.save_visualizations = lambda *a, **k: {}
+        test3.render_overlay = lambda *a, **k: None  # presentation only; nothing is written in this mode
         test3.cv2 = Cv2NoWrite(test3.cv2)
     if args.perturb:
         test3.cv2 = Cv2Perturbed(test3.cv2, args.perturb)

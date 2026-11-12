@@ -129,16 +129,37 @@ Use `run_paper.py`, not `test3.py` directly: the launcher fixes the paper's mode
 
 **3. Outputs.** For `scene.jpg`, `outputs/paper/` receives a three-panel comparison
 (original | overlay | relative depth), the separate images, the raw depth array and a JSON audit
-record. The layout, shown here on synthetic test data (not a model prediction):
+record. Real outputs on BDD100K validation images:
 
 <p align="center">
-  <img src="docs/assets/layout_demo.png" width="100%" alt="Synthetic layout preview: original, overlay, relative depth">
+  <img src="docs/assets/comparison_example.jpg" width="100%" alt="Original, overlay and relative depth of a BDD100K validation image">
 </p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/overlay_example.jpg" alt="Overlay: a car in the path raises BRAKE, parked cars are SIDE"></td>
+    <td width="50%"><img src="docs/assets/overlay_night.jpg" alt="Overlay at night: a degraded scene, the gates cap the advisory at BRAKE"></td>
+  </tr>
+  <tr>
+    <td>Daytime: the car ahead is in the <code>PATH</code> and raises <code>BRAKE</code>; parked cars are <code>SIDE</code> and stay at <code>MONITOR</code>.</td>
+    <td>Night, <code>DEGRADED</code> scene: the gates keep the advisory at <code>BRAKE</code>; non-<code>STABLE</code> depth is marked with <code>?</code>.</td>
+  </tr>
+</table>
+
+**Reading the overlay.** Each box takes the color of the advisory that object raised
+(`CLEAR` grey, `MONITOR` blue, `SLOW` yellow, `BRAKE` orange, `STOP` red); objects at `SLOW` or above
+are also filled. A label reads `class confidence  relation  u<index>`: `relation` is `PATH`,
+`EDGE` or `SIDE`, and `u` is the relative depth index (smaller is nearer, within this image only).
+A `?` after `u` (shown in amber) means the depth estimate is `CHECK` or `UNCERTAIN`. In crowded
+scenes the most severe objects get full labels and the others a one-letter tag (`P`, `E`, `S`).
+The card at the top left gives the global advisory, the object that decided it, the scene quality
+and the depth-only corridor state. Everything shown is read from the audit record; the overlay
+computes nothing.
 
 | File | Contents |
 |---|---|
 | `upgraded_scene_comparison.png` | Original, overlay and relative depth side by side |
-| `upgraded_scene_overlay.png` | Object masks/boxes, road/lane and advisory |
+| `upgraded_scene_overlay.png` | Boxes colored by advisory, road/lane, labels and advisory card |
 | `upgraded_scene_relative_depth.png` | Per-image colorized relative depth |
 | `upgraded_scene_raw_depth.npy` | Unnormalized model output |
 | `upgraded_scene.json` | Object-level audit record and artifact paths |

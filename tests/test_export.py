@@ -36,6 +36,15 @@ class ExportProfileTests(unittest.TestCase):
     def test_dry_run_does_not_load_models(self):
         self.assertEqual(runner.main(["example.jpg", "--dry-run"]), 0)
 
+    def test_non_ascii_paths_are_reported_on_windows_only(self):
+        paths = ["C:/data/\u1ea3nh/scene.jpg", "C:/data/images/scene.jpg"]
+        blocked = runner.non_ascii_paths(paths)
+        if runner.os.name == "nt":
+            self.assertEqual(len(blocked), 1)
+            self.assertIn("\u1ea3nh", blocked[0])
+        else:
+            self.assertEqual(blocked, [])
+
 
 if __name__ == "__main__":
     unittest.main()

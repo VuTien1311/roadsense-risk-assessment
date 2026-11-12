@@ -26,7 +26,7 @@ class RepositoryTests(unittest.TestCase):
         for name in private:
             result = subprocess.run(["git", "-C", str(ROOT), "check-ignore", "--no-index", name], capture_output=True)
             self.assertEqual(result.returncode, 0, name)
-        for name in ("run_paper.py", "paper_config.json", "docs/assets/layout_demo.png", "input/README.md", "checkpoints/README.md"):
+        for name in ("run_paper.py", "paper_config.json", "docs/assets/pipeline.png", "input/README.md", "checkpoints/README.md"):
             result = subprocess.run(["git", "-C", str(ROOT), "check-ignore", "--no-index", name], capture_output=True)
             self.assertEqual(result.returncode, 1, name)
 

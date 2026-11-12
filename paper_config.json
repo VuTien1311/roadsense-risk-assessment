@@ -16,6 +16,6 @@
   "yolo_tta": "full",
   "tile_inference": "off",
   "precision_mode": "strict",
-  "reproduction_status": "Original hard-set IDs and per-image outputs missing; exact paper tables are unverified.",
-  "unspecified_in_pdf": ["enhance_input", "yolo_tta", "tile_inference", "precision_mode"]
+  "reproduction_status": "Camera-ready numbers are regenerated from the published image-ID lists; see camera_ready/README.md.",
+  "fixed_inference_choices": ["enhance_input", "yolo_tta", "tile_inference", "precision_mode"]
 }

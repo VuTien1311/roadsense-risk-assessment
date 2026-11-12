@@ -11,7 +11,7 @@ from torchvision import transforms
 from ultralytics import YOLO
 
 from depth_anything_v2.dpt import DepthAnythingV2
-from paper_visualization import save_visualizations
+from paper_visualization import render_overlay, save_visualizations
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -2630,7 +2630,17 @@ class ADASPipeline:
             scene_quality,
             depth_scan,
         )
-        overlay_frame = annotated.copy()
+        overlay_frame = render_overlay(
+            raw_image,
+            road_mask,
+            lane_mask,
+            risk_records,
+            global_action,
+            global_advisory_confidence,
+            critical_label,
+            scene_quality,
+            depth_scan,
+        )
         annotated = append_detection_summary(annotated, annotation_records)
 
         os.makedirs(output_dir, exist_ok=True)
