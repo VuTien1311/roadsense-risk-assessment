@@ -24,7 +24,6 @@ ADVISORY_RGB = {
 }
 ROAD_RGB, LANE_RGB = (34, 197, 94), (253, 224, 71)
 CARD_RGBA, TEXT_RGB, MUTED_RGB, WARN_RGB = (15, 23, 42, 214), (248, 250, 252), (148, 163, 184), (252, 211, 77)
-STATE_MARK = {"STABLE": "", "CHECK": "?", "UNCERTAIN": "??", "UNAVAILABLE": "??"}
 FULL_LABEL_LIMIT = 8  # more labels than this hide the scene; the other objects get a one-letter tag
 
 
@@ -63,9 +62,11 @@ def _object_label(det, compact=False):
         main = f"{det.get('class', 'object')} {float(det.get('confidence', 0.0)):.2f}  {det.get('corridor_relation', '')}".rstrip()
     unit = det.get("original_inverse_depth_unit")
     state = str(det.get("original_unit_status", "")).upper()
-    mark = STATE_MARK.get(state, "?")
-    depth = f"u{float(unit):.1f}{mark}" if unit is not None else f"u n/a{mark}"
-    return main, depth, bool(mark)
+    uncertain = state != "STABLE"
+    depth = f"u{float(unit):.1f}" if unit is not None else "u n/a"
+    if uncertain:
+        depth += f" {state or 'UNKNOWN'}"  # the depth state is written out when it is not STABLE
+    return main, depth, uncertain
 
 
 def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisory="CLEAR", advisory_confidence=None,
@@ -76,8 +77,8 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
     detections: the per-object audit records of the report (class, confidence, box_xyxy,
     corridor_relation, original_unit_status, original_inverse_depth_unit, advisory, risk_score).
     Nothing is computed here: the overlay only shows what the fusion layer decided. ``u`` is the
-    relative depth index (smaller = nearer within this image, never meters); ``?`` marks a depth
-    estimate that is not STABLE.
+    relative depth index (smaller = nearer within this image, never meters); when the depth estimate
+    is not STABLE, its state (CHECK or UNCERTAIN) is written after u.
 
     text_scale, max_labels and compact only change the presentation (larger text and fewer labels for
     a small printed figure; compact keeps the advisory card to the advisory and the scene state and
@@ -211,7 +212,9 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
             draw.text((base_x, base_y), main, font=label_font, fill=TEXT_RGB + (255,))
             draw.text((base_x + main_w, base_y), depth, font=label_font, fill=(WARN_RGB if uncertain else TEXT_RGB) + (255,))
             continue
-        tag = (str(item["det"].get("corridor_relation", "?"))[:1] or "?") + ("?" if uncertain else "")
+        if compact:
+            continue  # small printed figure: the colored box alone shows the advisory
+        tag = str(item["det"].get("corridor_relation", "")) or "?"
         tag_w, tag_h, tag_top = _text_size(draw, tag, tag_font)
         left, top = min(x1, width - tag_w - 6), max(0, y1 - tag_h - 5)
         box = (left, top, left + tag_w + 6, top + tag_h + 5)

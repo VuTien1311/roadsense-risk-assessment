@@ -245,15 +245,25 @@ def draw_case(ax, title, key, gt_records):
         x1, y1, x2, y2 = obj["box"]
         ax.add_patch(plt.Rectangle((x1, y1), x2 - x1, y2 - y1, fill=False, edgecolor="black", linewidth=1.6))
         ax.add_patch(plt.Rectangle((x1, y1), x2 - x1, y2 - y1, fill=False, edgecolor="white", linewidth=0.7))
-    min_label_height = 0.08 * image.shape[0]
-    for det in report["detections"]:
+    height, width = image.shape[:2]
+    min_label_height = 0.12 * height
+    char_w, tag_h = 0.026 * width, 0.08 * height  # tag size in image pixels at the printed font size
+    placed = []
+    # Largest boxes first; a tag that would cover another tag is left out (the box keeps its color).
+    for det in sorted(report["detections"], key=lambda d: -(d["box_xyxy"][3] - d["box_xyxy"][1])):
         x1, y1, x2, y2 = det["box_xyxy"]
         color = RELATION_COLOR[det["corridor_relation"]]
         ax.add_patch(plt.Rectangle((x1, y1), x2 - x1, y2 - y1, fill=False, edgecolor=color, linewidth=1.4))
         if y2 - y1 < min_label_height:
-            continue  # small boxes keep their colour but no tag, to avoid clutter
-        tag = det["corridor_relation"][0] + ("" if det["original_unit_status"] == "STABLE" else "?")
-        ax.text(x1 + 2, y1 - 4, tag, color="white", fontsize=5.5, fontweight="bold",
+            continue
+        state = det["original_unit_status"]
+        tag = det["corridor_relation"] + ("" if state == "STABLE" else ", " + state)
+        tx = min(max(x1, 0), width - len(tag) * char_w)
+        rect = (tx, y1 - tag_h, tx + len(tag) * char_w, y1)
+        if any(rect[0] < r[2] and r[0] < rect[2] and rect[1] < r[3] and r[1] < rect[3] for r in placed):
+            continue
+        placed.append(rect)
+        ax.text(tx + 2, y1 - 4, tag, color="white", fontsize=5.0, fontweight="bold",
                 bbox={"boxstyle": "square,pad=0.1", "facecolor": color, "edgecolor": "none"})
     advisory = report["global_advisory"]
     scene = report["scene_quality"]["status"]
@@ -329,9 +339,9 @@ def fig_overlay_cases(cases):
 
 def qualitative_legend():
     return [
-        plt.Line2D([0], [0], color=ORANGE, linewidth=1.6, label="P: PATH"),
-        plt.Line2D([0], [0], color=AQUA, linewidth=1.6, label="E: EDGE"),
-        plt.Line2D([0], [0], color=BLUE, linewidth=1.6, label="S: SIDE (?: not STABLE)"),
+        plt.Line2D([0], [0], color=ORANGE, linewidth=1.6, label="PATH"),
+        plt.Line2D([0], [0], color=AQUA, linewidth=1.6, label="EDGE"),
+        plt.Line2D([0], [0], color=BLUE, linewidth=1.6, label="SIDE"),
         plt.Line2D([0], [0], color="black", linewidth=1.6, label="BDD100K box (white/black)"),
         plt.Rectangle((0, 0), 1, 1, facecolor="#78c878", edgecolor="none", label="GT ego lane (direct)"),
     ]
