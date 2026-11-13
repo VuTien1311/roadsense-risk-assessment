@@ -2640,6 +2640,7 @@ class ADASPipeline:
             critical_label,
             scene_quality,
             depth_scan,
+            label_all=True,
         )
         annotated = append_detection_summary(annotated, annotation_records)
 

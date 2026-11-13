@@ -169,14 +169,12 @@ labeled on the image:
 Objects without a box were not detected at all: the detector finds 78.9 % of the relevant road
 users on the test split (21 of 34 in the dense street above, 10 of 12 in the night scene).
 
-**Reading the overlay.** Each box takes the color of the advisory that object raised
-(`CLEAR` grey, `MONITOR` blue, `SLOW` yellow, `BRAKE` orange, `STOP` red); objects at `SLOW` or above
-are also filled. A label reads `class confidence  relation  range u<index>`: `relation` is `PATH`,
-`EDGE` or `SIDE`, and `u` is the relative depth index (smaller is nearer, within this image only).
-When the depth estimate is not `STABLE`, its state (`CHECK` or `UNCERTAIN`) follows `u`, in amber.
-In crowded scenes the most severe objects get full labels and the others a short tag (`PATH`,
-`EDGE`, `SIDE`).
-The card at the top left gives the global advisory, the object that decided it, the scene quality
+**Reading the overlay.** Every detected object gets a box and a label in the color of the advisory
+that object raised (`CLEAR` grey, `MONITOR` blue, `SLOW` yellow, `BRAKE` orange, `STOP` red);
+objects at `SLOW` or above are also filled. A label reads `class confidence relation u<index>`:
+`relation` is `PATH`, `EDGE` or `SIDE`, and `u` is the relative depth index (smaller is nearer,
+within this image only, never meters). `CHECK` or `UNCERTAIN` after `u` means the depth estimate
+is not `STABLE`. The card at the top left gives the global advisory, the object that decided it, the scene quality
 and the depth-only corridor state. Everything shown is read from the audit record; the overlay
 computes nothing.
 

@@ -77,7 +77,7 @@ def _object_label(det, compact=False):
 
 def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisory="CLEAR", advisory_confidence=None,
                    critical=None, scene_quality=None, depth_scan=None, text_scale=1.0, max_labels=FULL_LABEL_LIMIT,
-                   compact=False, numbered=False):
+                   compact=False, numbered=False, label_all=False):
     """Draw the fused result on the input image (BGR uint8 in, BGR uint8 out, same size).
 
     detections: the per-object audit records of the report (class, confidence, box_xyxy,
@@ -88,7 +88,8 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
 
     text_scale, max_labels and compact only change the presentation (larger text and fewer labels for
     a small printed figure; compact keeps the advisory card to the advisory and the scene state and
-    leaves the color legend to the figure caption). numbered tags every box with its object number
+    leaves the color legend to the figure caption). label_all writes a label on every box (class,
+    confidence, path relation, u, depth state). numbered tags every box with its object number
     (#1, #2, ... in the order of the audit record) so that render_object_table can list them all.
     """
     frame = np.asarray(image)
@@ -190,6 +191,32 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
         draw.rectangle((cursor, top, cursor + swatch, top + swatch), fill=color + (255,))
         draw.text((cursor + swatch + int(round(4 * scale)), legend[1] + int(round(4 * scale))), name, font=tag_font, fill=TEXT_RGB + (255,))
         cursor += swatch + int(round(14 * scale)) + text_w
+
+    if label_all:
+        # Every box gets its label, directly on its top edge, in the color of its advisory (far
+        # objects first, so the labels of nearer objects are drawn on top).
+        for item in sorted(objects, key=lambda o: o["box"][3]):
+            x1, y1, x2, y2 = item["box"]
+            det = item["det"]
+            unit = det.get("original_inverse_depth_unit")
+            state = str(det.get("original_unit_status", "")).upper()
+            text = f"{det.get('class', 'object')} {float(det.get('confidence', 0.0)):.2f} {det.get('corridor_relation', '')}"
+            text += f" u{float(unit):.1f}" if unit is not None else ""
+            text += "" if state == "STABLE" else f" {state or 'UNKNOWN'}"
+            if numbered:
+                text = f"#{item['number']} " + text
+            text_w, text_h, text_top = _text_size(draw, text, label_font)
+            label_w, label_h = text_w + 2 * pad, text_h + 2 * pad
+            left = min(max(x1, 0), max(0, width - label_w))
+            top = y1 - label_h if y1 - label_h >= 0 else y1
+            spot = (left, top, left + label_w, top + label_h)
+            if _overlaps(spot, card):  # never cover the advisory card: put the label inside the box
+                top = max(y1, card[3] + 1) if y2 - y1 > label_h else y2
+                spot = (left, top, left + label_w, top + label_h)
+            draw.rectangle(spot, fill=item["color"] + (255,))
+            draw.text((left + pad, top + pad - text_top), text, font=label_font, fill=(15, 23, 42, 255))
+        result = np.asarray(Image.alpha_composite(canvas, layer).convert("RGB"))
+        return cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
 
     # Labels: near (large) objects always get a full label, then the most severe ones up to the
     # limit; each label is placed where it covers no other label.

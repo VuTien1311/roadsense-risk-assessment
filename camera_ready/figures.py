@@ -326,7 +326,7 @@ def fig_overlay_cases(cases):
         image = cv2.imread(str(VAL / f"{key}.jpg"))
         masks = np.load(OUT / "cache" / "hybridnets" / f"{key}.npz")
         overlay = render_overlay(image, masks["road"], masks["lane"], report["detections"], report["global_advisory"],
-                                 None, None, report["scene_quality"], None, text_scale=2.6, max_labels=3, compact=True)
+                                 None, None, report["scene_quality"], None, text_scale=2.0, compact=True, label_all=True)
         ax.imshow(cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB))
         ax.set_title(f"({'abc'[index]}) {title}", fontsize=7, color=INK, pad=2)
         ax.set_xticks([])
