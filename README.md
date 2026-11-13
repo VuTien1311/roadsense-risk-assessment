@@ -153,6 +153,20 @@ record. Real outputs on BDD100K validation images:
   </tr>
 </table>
 
+**Every detection, with its numbers.** With `numbered=True` each detected object carries its number
+on the image, and `render_object_table` lists all of them with class, detector confidence, path
+relation, relative depth index `u`, depth state and the advisory that object raised:
+
+<p align="center">
+  <img src="docs/assets/detail_dense.jpg" width="100%" alt="Dense street: 25 numbered detections and a table of all of them">
+</p>
+<p align="center">
+  <img src="docs/assets/detail_night.jpg" width="100%" alt="Degraded night scene: 19 numbered detections and a table of all of them">
+</p>
+
+Objects without a box were not detected at all: the detector finds 78.9 % of the relevant road
+users on the test split (21 of 34 in the dense street above, 10 of 12 in the night scene).
+
 **Reading the overlay.** Each box takes the color of the advisory that object raised
 (`CLEAR` grey, `MONITOR` blue, `SLOW` yellow, `BRAKE` orange, `STOP` red); objects at `SLOW` or above
 are also filled. A label reads `class confidence  relation  u<index>`: `relation` is `PATH`,

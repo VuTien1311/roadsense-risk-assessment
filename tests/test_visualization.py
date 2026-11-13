@@ -73,6 +73,18 @@ class OverlayTests(unittest.TestCase):
                 render_overlay(bad)
 
 
+class ObjectTableTests(unittest.TestCase):
+    def test_numbered_overlay_and_table(self):
+        from paper_visualization import render_object_table
+        image = np.full((360, 640, 3), 60, np.uint8)
+        dets = [detection((10 + 20 * i, 100, 28 + 20 * i, 150), "MONITOR", "SIDE") for i in range(30)]
+        out = render_overlay(image, None, None, dets, "MONITOR", numbered=True)
+        self.assertEqual(out.shape, image.shape)
+        table = render_object_table(dets, 360)
+        self.assertEqual((table.shape[0], table.shape[2], table.dtype), (360, 3, np.uint8))
+        self.assertEqual(render_object_table([], 200).shape[0], 200)
+
+
 class VisualizationTests(unittest.TestCase):
     def setUp(self):
         self.original = np.full((180, 320, 3), (40, 70, 100), np.uint8)

@@ -71,7 +71,7 @@ def _object_label(det, compact=False):
 
 def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisory="CLEAR", advisory_confidence=None,
                    critical=None, scene_quality=None, depth_scan=None, text_scale=1.0, max_labels=FULL_LABEL_LIMIT,
-                   compact=False):
+                   compact=False, numbered=False):
     """Draw the fused result on the input image (BGR uint8 in, BGR uint8 out, same size).
 
     detections: the per-object audit records of the report (class, confidence, box_xyxy,
@@ -82,7 +82,8 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
 
     text_scale, max_labels and compact only change the presentation (larger text and fewer labels for
     a small printed figure; compact keeps the advisory card to the advisory and the scene state and
-    leaves the color legend to the figure caption).
+    leaves the color legend to the figure caption). numbered tags every box with its object number
+    (#1, #2, ... in the order of the audit record) so that render_object_table can list them all.
     """
     frame = np.asarray(image)
     if frame.ndim != 3 or frame.shape[2] != 3 or frame.dtype != np.uint8 or 0 in frame.shape[:2]:
@@ -115,7 +116,7 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
         y1, y2 = sorted((min(max(y1, 0), height - 1), min(max(y2, 0), height - 1)))
         action = str(det.get("advisory", "CLEAR")).upper()
         severity = ADVISORY_ORDER.index(action) if action in ADVISORY_ORDER else 0
-        objects.append({"det": det, "box": (x1, y1, x2, y2), "color": ADVISORY_RGB[ADVISORY_ORDER[severity]],
+        objects.append({"det": det, "number": len(objects) + 1, "box": (x1, y1, x2, y2), "color": ADVISORY_RGB[ADVISORY_ORDER[severity]],
                         "severity": severity, "risk": float(det.get("risk_score") or 0.0)})
 
     # Far objects first, so nearer boxes are drawn over them.
@@ -191,11 +192,13 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
     for item in ranked:
         x1, y1, x2, y2 = item["box"]
         main, depth, uncertain = _object_label(item["det"], compact)
+        if numbered:
+            main = f"#{item['number']} " + main
         main_w, main_h, main_top = _text_size(draw, main + "  ", label_font)
         depth_w, depth_h, _ = _text_size(draw, depth, label_font)
         label_w, label_h = stripe + 2 * pad + main_w + depth_w, max(main_h, depth_h) + 2 * pad
         spot = None
-        if full < max_labels and (y2 - y1) >= 0.03 * height:
+        if full < (min(max_labels, 6) if numbered else max_labels) and (y2 - y1) >= 0.03 * height:
             for left, top in ((x1, y1 - label_h - 2), (x1, y2 + 2), (x2 - label_w, y1 - label_h - 2), (x2 - label_w, y2 + 2), (x1 + line, y1 + line)):
                 left = min(max(left, 2), max(2, width - label_w - 2))
                 top = min(max(top, 2), max(2, height - label_h - 2))
@@ -214,12 +217,26 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
             continue
         if compact:
             continue  # small printed figure: the colored box alone shows the advisory
-        tag = str(item["det"].get("corridor_relation", "")) or "?"
+        tag = f"#{item['number']}" if numbered else (str(item["det"].get("corridor_relation", "")) or "?")
         tag_w, tag_h, tag_top = _text_size(draw, tag, tag_font)
         left, top = min(x1, width - tag_w - 6), max(0, y1 - tag_h - 5)
         box = (left, top, left + tag_w + 6, top + tag_h + 5)
         if any(_overlaps(box, other) for other in taken):
-            continue  # the colored box still shows the advisory; a tag here would cover a label
+            if not numbered:
+                continue  # the colored box still shows the advisory; a tag here would cover a label
+            # numbered mode: try inside the box, below it, then further up; skip only if all collide
+            w_tag, h_tag = tag_w + 6, tag_h + 5
+            spots = [(x1 + 2, y1 + 2), (x1, y2 + 2), (x1, y1 - 2 * h_tag - 2), (x2 - w_tag, y2 + 2), (x2 - w_tag, y1 - h_tag - 2)]
+            box = None
+            for sx, sy in spots:
+                sx, sy = min(max(sx, 0), width - w_tag), min(max(sy, 0), height - h_tag)
+                candidate = (sx, sy, sx + w_tag, sy + h_tag)
+                if not any(_overlaps(candidate, other) for other in taken):
+                    box = candidate
+                    break
+            if box is None:
+                continue
+            left, top = box[0], box[1]
         taken.append(box)
         draw.rectangle(box, fill=item["color"] + (255,))
         draw.text((left + 3, top + 2 - tag_top), tag, font=tag_font, fill=(15, 23, 42, 255))
@@ -327,3 +344,41 @@ def save_visualizations(original, overlay, raw_depth, output_dir, stem):
         write_png(files[key], frame)
     np.save(str(files["raw_depth"]), np.asarray(raw_depth), allow_pickle=False)
     return {"files": {key: str(path.resolve()) for key, path in files.items()}, "depth_display": normalization, "layout": "original | overlay | relative depth"}
+
+
+def render_object_table(detections, height, width=560):
+    """Side panel (BGR, given height) listing every fused object of an overlay drawn with
+    numbered=True: number, class, detector confidence, path relation, relative depth index u,
+    depth state and the advisory that object raised. Presentation only."""
+    rows = [d for d in (detections or ()) if (d.get("box_xyxy") or d.get("box"))]
+    panel = Image.new("RGB", (width, height), (15, 23, 42))
+    draw = ImageDraw.Draw(panel)
+    head, body = _font(max(13, height / 34)), _font(max(11, min(height / 40, (height - 70) / max(len(rows), 1) * 0.72)))
+    row_h = max(12, min(int(height / 28), int((height - 70) / max(len(rows), 1))))
+    columns = [("#", 8), ("class", 44), ("conf", 150), ("path", 210), ("u", 278), ("depth", 340), ("advisory", 438)]
+    y = 12
+    draw.text((8, y), f"All {len(rows)} detected objects", font=head, fill=TEXT_RGB)
+    y += int(head.size * 1.6) if hasattr(head, "size") else 28
+    for name, x in columns:
+        draw.text((x, y), name, font=body, fill=MUTED_RGB)
+    y += row_h
+    draw.line((8, y - 3, width - 8, y - 3), fill=(51, 65, 85), width=1)
+    for index, det in enumerate(rows, start=1):
+        if y + row_h > height - 4:
+            draw.text((8, y), f"... {len(rows) - index + 1} more", font=body, fill=MUTED_RGB)
+            break
+        action = str(det.get("advisory", "CLEAR")).upper()
+        state = str(det.get("original_unit_status", "")).upper()
+        unit = det.get("original_inverse_depth_unit")
+        values = [f"{index}", str(det.get("class", "")), f"{float(det.get('confidence', 0.0)):.2f}",
+                  str(det.get("corridor_relation", "")), f"{float(unit):.1f}" if unit is not None else "n/a",
+                  state.title(), action]
+        for (name, x), value in zip(columns, values):
+            color = TEXT_RGB
+            if name == "depth" and state != "STABLE":
+                color = WARN_RGB
+            if name == "advisory":
+                color = ADVISORY_RGB.get(action, TEXT_RGB)
+            draw.text((x, y), value, font=body, fill=color)
+        y += row_h
+    return cv2.cvtColor(np.asarray(panel), cv2.COLOR_RGB2BGR)
