@@ -1,7 +1,8 @@
 """Independent recomputation of the paper's headline numbers from the evaluation CSVs.
 
-Uses no project code: only csv + the macro file. Run from outputs/camera_ready:
-    python audit_numbers.py <camera_ready output folder>
+Uses no project code: only csv + the macro file.
+    python audit_numbers.py <folder>
+<folder> holds eval/ (from the camera-ready-results release archive) and paper/numbers.tex.
 PASS = the macro printed in the paper equals the value recomputed here (to the macro's own rounding).
 """
 import csv
