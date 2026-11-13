@@ -24,6 +24,9 @@ ADVISORY_RGB = {
 }
 ROAD_RGB, LANE_RGB = (34, 197, 94), (253, 224, 71)
 CARD_RGBA, TEXT_RGB, MUTED_RGB, WARN_RGB = (15, 23, 42, 214), (248, 250, 252), (148, 163, 184), (252, 211, 77)
+# Relative range band of the audit record (thresholds on u, set by the pipeline): words, never meters.
+BAND_WORDS = {"VERY-NEAR": "very near", "NEAR": "near", "MID": "mid", "FAR": "far", "VERY-FAR": "very far"}
+NEAR_BOX = 0.12  # boxes at least this share of the image height (near objects) always get a full label
 FULL_LABEL_LIMIT = 8  # more labels than this hide the scene; the other objects get a one-letter tag
 
 
@@ -64,6 +67,9 @@ def _object_label(det, compact=False):
     state = str(det.get("original_unit_status", "")).upper()
     uncertain = state != "STABLE"
     depth = f"u{float(unit):.1f}" if unit is not None else "u n/a"
+    band = BAND_WORDS.get(str(det.get("distance_band", "")).upper())
+    if band and not compact:
+        depth = f"{band} {depth}"
     if uncertain:
         depth += f" {state or 'UNKNOWN'}"  # the depth state is written out when it is not STABLE
     return main, depth, uncertain
@@ -185,12 +191,20 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
         draw.text((cursor + swatch + int(round(4 * scale)), legend[1] + int(round(4 * scale))), name, font=tag_font, fill=TEXT_RGB + (255,))
         cursor += swatch + int(round(14 * scale)) + text_w
 
-    # Labels: the most severe objects get a full label, placed where it covers no other label.
+    # Labels: near (large) objects always get a full label, then the most severe ones up to the
+    # limit; each label is placed where it covers no other label.
     taken = [card, legend]
-    ranked = sorted(objects, key=lambda o: (-o["severity"], -o["risk"], -(o["box"][2] - o["box"][0]) * (o["box"][3] - o["box"][1])))
+
+    def is_near(item):
+        return not compact and (item["box"][3] - item["box"][1]) >= NEAR_BOX * height
+
+    ranked = sorted(objects, key=lambda o: (-is_near(o), -o["severity"], -o["risk"],
+                                            -(o["box"][2] - o["box"][0]) * (o["box"][3] - o["box"][1])))
     full = 0
+    limit = min(max_labels, 6) if numbered else max_labels
     for item in ranked:
         x1, y1, x2, y2 = item["box"]
+        near = is_near(item)
         main, depth, uncertain = _object_label(item["det"], compact)
         if numbered:
             main = f"#{item['number']} " + main
@@ -198,8 +212,11 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
         depth_w, depth_h, _ = _text_size(draw, depth, label_font)
         label_w, label_h = stripe + 2 * pad + main_w + depth_w, max(main_h, depth_h) + 2 * pad
         spot = None
-        if full < (min(max_labels, 6) if numbered else max_labels) and (y2 - y1) >= 0.03 * height:
-            for left, top in ((x1, y1 - label_h - 2), (x1, y2 + 2), (x2 - label_w, y1 - label_h - 2), (x2 - label_w, y2 + 2), (x1 + line, y1 + line)):
+        if (near or full < limit) and (y2 - y1) >= 0.03 * height:
+            spots = [(x1, y1 - label_h - 2), (x1, y2 + 2), (x2 - label_w, y1 - label_h - 2), (x2 - label_w, y2 + 2), (x1 + line, y1 + line)]
+            if near:  # a large box has room inside for its label
+                spots += [(x1 + line, y2 - label_h - line), (x1 + line, (y1 + y2 - label_h) // 2)]
+            for left, top in spots:
                 left = min(max(left, 2), max(2, width - label_w - 2))
                 top = min(max(top, 2), max(2, height - label_h - 2))
                 candidate = (left, top, left + label_w, top + label_h)
@@ -207,7 +224,7 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
                     spot = candidate
                     break
         if spot is not None:
-            full += 1
+            full += 0 if near else 1
             taken.append(spot)
             draw.rounded_rectangle(spot, radius=radius, fill=CARD_RGBA)
             draw.rounded_rectangle((spot[0], spot[1], spot[0] + stripe, spot[3]), radius=stripe // 2, fill=item["color"] + (255,))
@@ -346,16 +363,16 @@ def save_visualizations(original, overlay, raw_depth, output_dir, stem):
     return {"files": {key: str(path.resolve()) for key, path in files.items()}, "depth_display": normalization, "layout": "original | overlay | relative depth"}
 
 
-def render_object_table(detections, height, width=560):
+def render_object_table(detections, height, width=640):
     """Side panel (BGR, given height) listing every fused object of an overlay drawn with
-    numbered=True: number, class, detector confidence, path relation, relative depth index u,
-    depth state and the advisory that object raised. Presentation only."""
+    numbered=True: number, class, detector confidence, path relation, relative range band and
+    depth index u (never meters), depth state and the advisory that object raised. Presentation only."""
     rows = [d for d in (detections or ()) if (d.get("box_xyxy") or d.get("box"))]
     panel = Image.new("RGB", (width, height), (15, 23, 42))
     draw = ImageDraw.Draw(panel)
     head, body = _font(max(13, height / 34)), _font(max(11, min(height / 40, (height - 70) / max(len(rows), 1) * 0.72)))
     row_h = max(12, min(int(height / 28), int((height - 70) / max(len(rows), 1))))
-    columns = [("#", 8), ("class", 44), ("conf", 150), ("path", 210), ("u", 278), ("depth", 340), ("advisory", 438)]
+    columns = [("#", 8), ("class", 40), ("conf", 132), ("path", 186), ("range", 250), ("u", 348), ("depth", 404), ("advisory", 498)]
     y = 12
     draw.text((8, y), f"All {len(rows)} detected objects", font=head, fill=TEXT_RGB)
     y += int(head.size * 1.6) if hasattr(head, "size") else 28
@@ -371,7 +388,8 @@ def render_object_table(detections, height, width=560):
         state = str(det.get("original_unit_status", "")).upper()
         unit = det.get("original_inverse_depth_unit")
         values = [f"{index}", str(det.get("class", "")), f"{float(det.get('confidence', 0.0)):.2f}",
-                  str(det.get("corridor_relation", "")), f"{float(unit):.1f}" if unit is not None else "n/a",
+                  str(det.get("corridor_relation", "")), BAND_WORDS.get(str(det.get("distance_band", "")).upper(), "n/a"),
+                  f"{float(unit):.1f}" if unit is not None else "n/a",
                   state.title(), action]
         for (name, x), value in zip(columns, values):
             color = TEXT_RGB

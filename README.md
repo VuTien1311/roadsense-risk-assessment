@@ -155,7 +155,9 @@ record. Real outputs on BDD100K validation images:
 
 **Every detection, with its numbers.** With `numbered=True` each detected object carries its number
 on the image, and `render_object_table` lists all of them with class, detector confidence, path
-relation, relative depth index `u`, depth state and the advisory that object raised:
+relation, relative range (`very near`, `near`, `mid`, `far`: bands of `u`, not meters), relative depth
+index `u`, depth state and the advisory that object raised. Near objects (large boxes) are always
+labeled on the image:
 
 <p align="center">
   <img src="docs/assets/detail_dense.jpg" width="100%" alt="Dense street: 25 numbered detections and a table of all of them">
@@ -169,7 +171,7 @@ users on the test split (21 of 34 in the dense street above, 10 of 12 in the nig
 
 **Reading the overlay.** Each box takes the color of the advisory that object raised
 (`CLEAR` grey, `MONITOR` blue, `SLOW` yellow, `BRAKE` orange, `STOP` red); objects at `SLOW` or above
-are also filled. A label reads `class confidence  relation  u<index>`: `relation` is `PATH`,
+are also filled. A label reads `class confidence  relation  range u<index>`: `relation` is `PATH`,
 `EDGE` or `SIDE`, and `u` is the relative depth index (smaller is nearer, within this image only).
 When the depth estimate is not `STABLE`, its state (`CHECK` or `UNCERTAIN`) follows `u`, in amber.
 In crowded scenes the most severe objects get full labels and the others a short tag (`PATH`,
