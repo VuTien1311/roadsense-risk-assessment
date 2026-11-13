@@ -419,6 +419,67 @@ def fig_regions():
     (FIG / "fig_regions_case.json").write_text(json.dumps(cases, indent=2), encoding="utf-8")
 
 
+def fig_pipeline():
+    """Data flow of the method (vector, column width). Scene quality is computed from the image
+    itself; the path relation needs the detector and HybridNets; the depth reliability needs the
+    detector masks and the depth field; the fallback reads the depth along the corridor."""
+    from matplotlib.patches import FancyBboxPatch
+
+    fig, ax = plt.subplots(figsize=(3.45, 1.53))
+    ax.set_xlim(0, 3.45)
+    ax.set_ylim(0, 1.53)
+    ax.axis("off")
+    fills = {"input": "#e8eef7", "model": "#e2f0e4", "reason": "#fbf3d6", "fusion": "#fde4d0", "output": "#f8d7d6"}
+
+    def box(x, y, w, h, title, sub=None, kind="model", dashed=False):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=0.045", linewidth=0.6,
+                                    edgecolor=INK2, facecolor="white" if dashed else fills[kind],
+                                    linestyle=(0, (3, 2)) if dashed else "-"))
+        if sub is None:
+            ax.text(x + w / 2, y + h / 2, title, ha="center", va="center", fontsize=5.6, color=INK, linespacing=1.15)
+        else:
+            ax.text(x + w / 2, y + h * 0.66, title, ha="center", va="center", fontsize=5.8, color=INK, fontweight="bold")
+            ax.text(x + w / 2, y + h * 0.27, sub, ha="center", va="center", fontsize=5.0, color=INK2)
+
+    def route(points, dashed=False):
+        style = (0, (3, 2)) if dashed else "-"
+        xs, ys = zip(*points[:-1]) if len(points) > 2 else ((), ())
+        if len(points) > 2:
+            ax.plot(xs, ys, color=INK2, linewidth=0.6, linestyle=style, solid_capstyle="butt")
+        ax.annotate("", xy=points[-1], xytext=points[-2],
+                    arrowprops={"arrowstyle": "-|>", "color": INK2, "linewidth": 0.6, "linestyle": style,
+                                "shrinkA": 0, "shrinkB": 0, "mutation_scale": 5})
+
+    h = 0.24
+    box(0.02, 0.537, 0.38, 0.440, "Front\nimage", kind="input")
+    box(0.56, 0.955, 0.94, h, "HybridNets-D3", "road + lanes")
+    box(0.56, 0.638, 0.94, h, "YOLO11x-seg", "objects + masks")
+    box(0.56, 0.321, 0.94, h, "Depth Anything V2", "relative depth")
+    box(1.68, 1.272, 0.98, h, "Scene quality", "light, contrast, blur", "reason")
+    box(1.68, 0.796, 0.98, h, "Path relation", "PATH / EDGE / SIDE", "reason")
+    box(1.68, 0.480, 0.98, h, "Depth reliability", "STABLE / CHECK / UNC.", "reason")
+    box(2.80, 0.704, 0.63, 0.805, "Fail-aware\nfusion\n\nrisk score,\nseverity gates", kind="fusion")
+    box(2.80, 0.264, 0.63, 0.299, "Advisory +\naudit record", kind="output")
+    box(0.56, 0.026, 2.10, 0.185, "Depth-only corridor fallback: CLEAR $\\rightarrow$ MONITOR", dashed=True)
+
+    route([(0.40, 0.757), (0.56, 0.757)])
+    route([(0.40, 0.854), (0.48, 0.854), (0.48, 1.074), (0.56, 1.074)])
+    route([(0.40, 0.660), (0.48, 0.660), (0.48, 0.440), (0.56, 0.440)])
+    route([(0.21, 0.977), (0.21, 1.390), (1.68, 1.390)])                     # image -> scene quality
+    route([(1.50, 1.074), (1.59, 1.074), (1.59, 0.959), (1.68, 0.959)])       # HybridNets -> path relation
+    route([(1.50, 0.801), (1.59, 0.801), (1.59, 0.871), (1.68, 0.871)])       # YOLO -> path relation
+    route([(1.50, 0.713), (1.59, 0.713), (1.59, 0.642), (1.68, 0.642)])       # YOLO -> depth reliability
+    route([(1.50, 0.440), (1.59, 0.440), (1.59, 0.554), (1.68, 0.554)])       # depth -> depth reliability
+    route([(2.66, 1.390), (2.80, 1.390)])
+    route([(2.66, 0.915), (2.80, 0.915)])
+    route([(2.66, 0.598), (2.73, 0.598), (2.73, 0.774), (2.80, 0.774)])
+    route([(3.115, 0.704), (3.115, 0.563)])
+    route([(1.03, 0.321), (1.03, 0.211)], dashed=True)                      # depth -> fallback
+    route([(2.66, 0.119), (3.115, 0.119), (3.115, 0.264)], dashed=True)     # fallback -> advisory
+    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    save(fig, "fig_pipeline")
+
+
 def save(fig, name):
     FIG.mkdir(parents=True, exist_ok=True)
     fig.savefig(FIG / f"{name}.pdf", bbox_inches="tight", pad_inches=0.02)
@@ -430,6 +491,7 @@ def save(fig, name):
 def main():
     results_path = OUT / "results.json"
     results = json.loads(results_path.read_text(encoding="utf-8")) if results_path.exists() else {}
+    fig_pipeline()
     fig_sensitivity(results)
     fig_operating(results)
     fig_qualitative()

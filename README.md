@@ -101,14 +101,21 @@ py -3.11 -m venv .venv
 The default requirements keep the CUDA 11.8 / PyTorch 2.7.1 recipe; for CPU-only use install
 `requirements-cpu.txt` (slow).
 
-**1. Weights** are not bundled and are ignored by Git. See [docs/WEIGHTS.md](docs/WEIGHTS.md) for
-the official sources; the SHA-256 values used in the paper are in `weights_manifest.json`.
+**1. Weights.** The three checkpoints are the official pretrained files of their authors and are
+not stored here. One command downloads them from the original releases (about 1.5 GB) and keeps
+each file only if its size and SHA-256 match the values used for the paper:
 
-```text
-yolo11x-seg.pt
-hybrid2/weights/hybridnets.pth
-checkpoints/depth_anything_v2_vitl.pth
+```powershell
+& .\.venv\Scripts\python.exe scripts\download_weights.py
 ```
+
+| File | Model | License |
+|---|---|---|
+| `yolo11x-seg.pt` | YOLO11x-seg (Ultralytics, COCO) | AGPL-3.0 |
+| `hybrid2/weights/hybridnets.pth` | HybridNets-D3 (BDD100K) | MIT |
+| `checkpoints/depth_anything_v2_vitl.pth` | Depth Anything V2 ViT-L | CC-BY-NC-4.0, non-commercial |
+
+Sources, manual setup and notes: [docs/WEIGHTS.md](docs/WEIGHTS.md).
 
 **2. Run.** Place images in `input/`, then double-click `RUN.bat`, or:
 
