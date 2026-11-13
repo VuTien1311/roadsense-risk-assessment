@@ -149,7 +149,7 @@ record. Real outputs on BDD100K validation images:
   </tr>
   <tr>
     <td>Daytime: the car ahead is in the <code>PATH</code> and raises <code>BRAKE</code>; parked cars are <code>SIDE</code> and stay at <code>MONITOR</code>.</td>
-    <td>Night, <code>DEGRADED</code> scene: the gates keep the advisory at <code>BRAKE</code>; non-<code>STABLE</code> depth is marked with <code>?</code>.</td>
+    <td>Night, <code>DEGRADED</code> scene: the gates keep the advisory at <code>BRAKE</code>; depth that is not <code>STABLE</code> is labeled <code>CHECK</code>.</td>
   </tr>
 </table>
 
@@ -157,8 +157,9 @@ record. Real outputs on BDD100K validation images:
 (`CLEAR` grey, `MONITOR` blue, `SLOW` yellow, `BRAKE` orange, `STOP` red); objects at `SLOW` or above
 are also filled. A label reads `class confidence  relation  u<index>`: `relation` is `PATH`,
 `EDGE` or `SIDE`, and `u` is the relative depth index (smaller is nearer, within this image only).
-A `?` after `u` (shown in amber) means the depth estimate is `CHECK` or `UNCERTAIN`. In crowded
-scenes the most severe objects get full labels and the others a one-letter tag (`P`, `E`, `S`).
+When the depth estimate is not `STABLE`, its state (`CHECK` or `UNCERTAIN`) follows `u`, in amber.
+In crowded scenes the most severe objects get full labels and the others a short tag (`PATH`,
+`EDGE`, `SIDE`).
 The card at the top left gives the global advisory, the object that decided it, the scene quality
 and the depth-only corridor state. Everything shown is read from the audit record; the overlay
 computes nothing.
