@@ -1,0 +1,12 @@
+id,image,timeofday,weather,author_note (real miss / annotation edge case / other)
+1,b54c48fe-0633723b,daytime,clear,
+2,b82f91d7-bfddb3c7,daytime,snowy,
+3,b99f250d-886111c5,night,clear,
+4,bd8f4dfa-4e126a95,daytime,clear,
+5,be64f818-053b36ba,daytime,snowy,
+6,c084d6cb-9113f4ba,night,clear,
+7,c174b1bd-ff23da83,daytime,undefined,
+8,c3822b6a-0ef41057,night,clear,
+9,c6c8c8a2-cb166bb4,daytime,overcast,
+10,c93310c6-1224728c,daytime,overcast,
+11,c968f598-3507eb4b,night,clear,

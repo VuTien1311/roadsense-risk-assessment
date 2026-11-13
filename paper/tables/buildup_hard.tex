@@ -1,0 +1,18 @@
+\begin{table}[t]
+\centering
+\caption{Cumulative build-up on the hard set (\%). Flip: advisory change under mild perturbation (hard set)}
+\label{tab:buildup_hard}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lccccc}
+\hline
+Configuration & Unsafe & \% & Over-c. & Severe & Flip \\
+\hline
+B0: YOLO only (road/depth priors) & 1/30 & 3.3 & 59.7 & 49.0 & 13.0 \\
+B1: + HybridNets corridor & 1/30 & 3.3 & 62.7 & 47.0 & -- \\
+B2: + DA V2, single region & 1/30 & 3.3 & 59.7 & 54.0 & -- \\
+B3: + multi-region, scene quality & 1/30 & 3.3 & 61.2 & 55.0 & 14.5 \\
+Full: + gates, fallback (proposed) & 0/30 & 0.0 & 50.7 & 47.0 & 8.3 \\
+\hline
+\end{tabular}
+\end{table}

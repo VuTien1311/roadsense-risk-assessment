@@ -1,0 +1,20 @@
+\begin{table}[t]
+\centering
+\caption{Leave-one-out ablations on the test set ($p$: exact McNemar test on unsafe \textsc{Clear} vs.\ full)}
+\label{tab:loo_test}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lccccc}
+\hline
+Variant & Unsafe & Over-c. & Severe & Changed & $p$ \\
+\hline
+Full system & 11/3{,}250 & 82.1 & 65.1 & -- & -- \\
+w/o HybridNets (road prior) & 13/3{,}250 & 80.3 & 65.6 & 364 & 0.62 \\
+w/o DA V2 (depth prior) & 12/3{,}250 & 83.0 & 55.8 & 3{,}631 & 1.00 \\
+w/o multi-region (center) & 11/3{,}250 & 82.0 & 65.0 & 47 & 1.00 \\
+w/o scene quality in fusion & 14/3{,}250 & 82.4 & 65.7 & 232 & 0.25 \\
+w/o severity gates & 11/3{,}250 & 88.2 & 74.5 & 4{,}024 & 1.00 \\
+w/o depth-only fallback & 15/3{,}250 & 82.1 & 65.1 & 236 & 0.12 \\
+\hline
+\end{tabular}
+\end{table}

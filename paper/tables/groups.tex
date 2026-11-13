@@ -1,0 +1,28 @@
+\begin{table}[t]
+\centering
+\caption{Results by difficulty category, time of day, and weather (\%)}
+\label{tab:groups}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccccc}
+\hline
+Group & Img. & Obj. & Stable & Prec. & Rec. & Unsafe \textsc{Clear} \\
+\hline
+\multicolumn{7}{l}{\emph{Hard set, by difficulty category}} \\
+Blur & 20 & 43 & 81.4 & 83.7 & 56.9 & 0/3 \\
+Dark & 20 & 52 & 90.4 & 82.7 & 66.1 & 0/2 \\
+Low contrast & 20 & 93 & 81.7 & 72.0 & 69.0 & 0/7 \\
+Glare & 20 & 110 & 89.1 & 93.6 & 78.4 & 0/5 \\
+Complex & 20 & 207 & 87.4 & 90.3 & 77.2 & 0/13 \\
+\hline
+\multicolumn{7}{l}{\emph{Test split, by time of day and weather}} \\
+Daytime & 4{,}993 & 46{,}431 & 86.6 & 92.9 & 83.3 & 7/1{,}944 \\
+Dawn/dusk & 739 & 6{,}381 & 85.4 & 91.7 & 82.2 & 0/269 \\
+Night & 3{,}734 & 22{,}872 & 81.1 & 80.7 & 70.4 & 4/1{,}027 \\
+Clear & 5{,}056 & 36{,}396 & 83.8 & 86.3 & 76.3 & 6/1{,}563 \\
+Rainy & 708 & 5{,}155 & 83.3 & 88.5 & 75.9 & 0/220 \\
+Snowy & 737 & 5{,}896 & 84.1 & 89.5 & 78.6 & 2/269 \\
+Foggy & 13 & 85 & 74.1 & 83.5 & 76.1 & 0/4 \\
+\hline
+\end{tabular}
+\end{table}

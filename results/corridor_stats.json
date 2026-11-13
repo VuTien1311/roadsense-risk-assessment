@@ -1,0 +1,20 @@
+{
+  "hard": {
+    "images": 100,
+    "mean_lane_guided_rows": 0.08931769722814499,
+    "images_mostly_trapezoid": 0.84,
+    "images_no_lane_rows": 0.59
+  },
+  "standard": {
+    "images": 1000,
+    "mean_lane_guided_rows": 0.10276119402985075,
+    "images_mostly_trapezoid": 0.805,
+    "images_no_lane_rows": 0.503
+  },
+  "test": {
+    "images": 9500,
+    "mean_lane_guided_rows": 0.09800336662551902,
+    "images_mostly_trapezoid": 0.8161052631578948,
+    "images_no_lane_rows": 0.515578947368421
+  }
+}

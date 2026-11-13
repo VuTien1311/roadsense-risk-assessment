@@ -30,6 +30,7 @@ caution, but it can never create an object or justify a severe advisory.
 - [How it works](#how-it-works)
 - [Results](#results)
 - [Quick start](#quick-start)
+- [Paper, slides and results](#paper-slides-and-results)
 - [Reproducing the paper](#reproducing-the-paper)
 - [Repository layout](#repository-layout)
 - [Limitations](#limitations)
@@ -188,6 +189,19 @@ computes nothing.
 
 Warm colors are nearer and cool colors farther **within the same image**; they are not meters.
 
+## Paper, slides and results
+
+| What | Where |
+|---|---|
+| Camera-ready paper (6 pages) and extended version with the supplementary appendix | [`paper/main.pdf`](paper/main.pdf), [`paper/main_extended.pdf`](paper/main_extended.pdf) |
+| LaTeX source; every number comes from the generated `numbers.tex` | [`paper/`](paper/README.md) |
+| Conference slides with speaker notes (23 slides) | [`slides/`](slides/) |
+| Aggregated results behind every table and figure | [`results/results.json`](results/results.json) |
+| Changes made for the camera-ready version, reviewer by reviewer | [`results/CAMERA_READY_CHANGES.md`](results/CAMERA_READY_CHANGES.md) |
+| Unsafe-CLEAR and lane audit tables | [`results/audit/`](results/audit/) |
+| Per-image and per-object evaluation CSVs of all 97 runs (test, hard, dev, 1k, val_rest, train) and the dataset-average priors | [Release `camera-ready-results`](https://github.com/VuTien1311/roadsense-risk-assessment/releases/tag/camera-ready-results) |
+| Scripts that recompute the paper's numbers from the CSVs and check every claim | [`camera_ready/audit_tools/`](camera_ready/audit_tools/) |
+
 ## Reproducing the paper
 
 Everything in the paper is regenerated from [`camera_ready/`](camera_ready/README.md): no number
@@ -220,6 +234,11 @@ must be obtained separately under their own terms.
 |-- paper_visualization.py        # Original / overlay / depth rendering
 |-- weights_manifest.json         # Official sources and checkpoint hashes
 |-- camera_ready/                 # Ground-truth evaluation, ablations, tables, figures, ID lists
+|   |-- kaggle/                   # Kaggle GPU/CPU runners (accounts via environment variables)
+|   `-- audit_tools/              # Independent re-computation of the paper's numbers
+|-- paper/                        # Camera-ready LaTeX source and PDFs
+|-- slides/                       # Conference slides (PPTX and PDF)
+|-- results/                      # results.json, audit tables, camera-ready changes
 |-- static_training/              # Hard-set selection and audit helpers (no training)
 |-- depth_anything_v2/            # Vendored Depth Anything V2 implementation
 |-- hybrid2/                      # Vendored HybridNets implementation

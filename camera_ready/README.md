@@ -47,8 +47,9 @@ never mixed.
 
 ## Kaggle runs
 
-The driver scripts of these runs (`kaggle/`, `chain*.sh`) are tied to the authors' accounts and
-machines and are not part of this public release; this section documents how the runs were made.
+The scripts in `kaggle/` read the Kaggle account names from the environment (`KAGGLE_OWNER`,
+`KAGGLE_TEAM_OWNER`, `KAGGLE_TEAM_TOKEN` for the path of a second account's token file); no
+credential is stored in this repository.
 
 All datasets and kernels are private. The train split ran on two of the authors'
 Kaggle accounts; the second one had read-only access to the four input datasets

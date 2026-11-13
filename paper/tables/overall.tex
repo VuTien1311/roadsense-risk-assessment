@@ -1,0 +1,30 @@
+\begin{table}[t]
+\centering
+\caption{Internal reliability and ground-truth results}
+\label{tab:overall}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcc}
+\hline
+Measure & Hard (100) & Test (9{,}500) \\
+\hline
+Accepted detections & 505 & 75{,}819 \\
+\textsc{Stable}/\textsc{Check}/\textsc{Uncertain} & 437/67/1 & 64{,}334/11{,}104/354 \\
+Stable ratio, Wilson 95\% CI & 86.5 [83.3, 89.2] & 84.9 [84.6, 85.1] \\
+Stable ratio, image-bootstrap CI & 86.5 [83.5, 89.2] & 84.9 [84.6, 85.1] \\
+\hline
+Detection precision (GT) & 86.3 [82.9, 89.6] & 89.1 [88.8, 89.4] \\
+Recall, relevant road users & 72.2 [67.2, 77.3] & 78.9 [78.4, 79.3] \\
+\textsc{Path} precision (matched) & 15.8 [11.0, 22.3] & 9.2 [8.8, 9.5] \\
+\textsc{Path} recall (matched) & 56.8 [42.2, 70.3] & 53.8 [52.3, 55.2] \\
+Corridor IoU with GT ego lane & 0.242 & 0.240 \\
+\hline
+Occupied images & 30 & 3{,}250 \\
+Unsafe \textsc{Clear}, fallback on & 0/30 (0.0) & 11/3{,}250 (0.3) \\
+Unsafe \textsc{Clear}, fallback off & 1/30 (3.3) & 15/3{,}250 (0.5) \\
+Over-caution (free ego lane) & 34/67 (50.7) & 4{,}799/5{,}844 (82.1) \\
+Unsupported \textsc{Brake}/\textsc{Stop} & 31/47 & 4{,}179/6{,}188 \\
+Detector-empty / fallback fired & 15/15 & 295/236 \\
+\hline
+\end{tabular}
+\end{table}

@@ -1,0 +1,16 @@
+\begin{table}[t]
+\centering
+\caption{Reliability states against BDD100K annotations (hard set, \%)}
+\label{tab:states_hard}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lccccc}
+\hline
+State & $n$ & False positive & Occl. & Trunc. & IoU \\
+\hline
+\textsc{Stable} & 437 & 11.9 [8.9, 15.1] & 58.7 & 2.1 & 0.807 \\
+\textsc{Check} & 67 & 23.9 [13.9, 34.2] & 33.3 & 78.4 & 0.863 \\
+\textsc{Uncertain} & 1 & 100.0 [100.0, 100.0] & -- & -- & -- \\
+\hline
+\end{tabular}
+\end{table}

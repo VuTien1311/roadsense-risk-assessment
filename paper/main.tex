@@ -1,0 +1,244 @@
+\documentclass[conference,a4paper]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage[hidelinks,bookmarks=false]{hyperref}
+\hypersetup{pdftitle={Conservative Road-Scene Risk Assessment via Fail-Aware Multi-Model Fusion},
+  pdfauthor={Pham Hoang Bach, Vu Gia Tien, Trinh Quang Tien, Cao Van Mai}}
+\input{numbers}
+% Public repository commit that holds the evaluation code of this version (the generated macro is the
+% authors' internal commit, which is not published).
+\renewcommand{\CodeCommit}{4a5051e}
+% \Extended=1 builds the extended version (supplementary appendix with every table and figure).
+\providecommand{\Extended}{0}
+\newif\ifextended
+\ifnum\Extended=1 \extendedtrue\fi
+% Public repository with code, image-ID manifests and evaluation scripts.
+\newcommand{\RepoURL}{\url{https://github.com/VuTien1311/roadsense-risk-assessment}}
+\newcommand{\st}[1]{\textsc{#1}}
+
+\begin{document}
+
+\title{Conservative Road-Scene Risk Assessment via Fail-Aware Multi-Model Fusion}
+
+\author{
+\IEEEauthorblockN{Pham Hoang Bach}
+\IEEEauthorblockA{\textit{Faculty of Artificial Intelligence}\\
+\textit{FPT University}\\
+Hanoi, Vietnam\\
+phamhoangbach3101@gmail.com}
+\and
+\IEEEauthorblockN{Vu Gia Tien}
+\IEEEauthorblockA{\textit{Faculty of Artificial Intelligence}\\
+\textit{FPT University}\\
+Hanoi, Vietnam\\
+tienvu131106@gmail.com}
+\and
+\IEEEauthorblockN{Trinh Quang Tien}
+\IEEEauthorblockA{\textit{Faculty of Artificial Intelligence}\\
+\textit{FPT University}\\
+Hanoi, Vietnam\\
+trinhquangtienhbtnhp@gmail.com}
+\and
+\IEEEauthorblockN{Cao Van Mai}
+\IEEEauthorblockA{\textit{Faculty of Artificial Intelligence}\\
+\textit{FPT University}\\
+Hanoi, Vietnam\\
+maicv2@fe.edu.vn}
+}
+
+\maketitle
+
+\begin{abstract}
+Single-image assessment of road hazards is limited by detector misses, scale-ambiguous monocular depth, and uncertain object-to-path relationships. This paper presents a fail-aware fusion layer that combines YOLO11 object evidence, HybridNets drivable-area and lane cues, and Depth Anything V2 relative depth while keeping component uncertainty explicit until the advisory stage. Scene-quality assessment, a multi-region object-depth consistency check, path-relation reasoning, severity gates, and a depth-only corridor fallback turn the evidence into a conservative advisory with an audit record for every object. The frozen pipeline is evaluated against BDD100K annotations on a 9{,}500-image validation test split and a reproducible 100-image hard set. Of the accepted test detections, \TestStablePct\% receive a \st{Stable} depth estimate, and non-\st{Stable} estimates are \TestFPRatio{} times more likely to be false positives. Unsafe \st{Clear} advisories occur on \TestUnsafe{} of \TestOccupied{} images whose ego lane holds a relevant road user. This safety comes at a measured cost: \st{Clear} is issued on only \TestClearPct\% of test images, mainly because a perspective ego corridor assigns many roadside and distant objects to the path. Cached-replay ablations, an operating curve, and perturbation tests quantify each component. Code and image-ID manifests are released.
+\end{abstract}
+
+\begin{IEEEkeywords}
+advanced driver assistance systems, BDD100K, monocular depth estimation, multi-model fusion, selective prediction, uncertainty, YOLO11.
+\end{IEEEkeywords}
+
+\section{Introduction}
+Driver-assistance perception commonly combines object detection, drivable-area and lane segmentation, and monocular depth estimation, each with its own failure modes. A detector can localize a vehicle without determining whether it lies in the ego path; a drivable-area model can mark road pixels as traversable although an obstacle occupies them; and monocular depth orders a scene from near to far, but its scale is ambiguous and its local estimates become unstable under darkness, glare, blur, weak texture, or occlusion~\cite{bdd100k,dav2}.
+
+The practical challenge is therefore to decide when the combined evidence is strong enough to support an advisory. Collapsing detector, road, lane, and depth outputs into one precise-looking warning hides uncertainty, especially for a single image, where ego speed, object velocity, and temporal consistency are unavailable. A conservative system should avoid unsupported clear-path conclusions and expose uncertainty when evidence is weak or inconsistent, in the spirit of selective prediction~\cite{geifman2017} and run-time monitoring of learned perception~\cite{rahman2021}.
+
+This paper studies conservative road-hazard assessment from a single front-facing image. Object, road, depth, and image-quality evidence stay separate until the advisory stage: YOLO11 provides detections and instance masks, HybridNets drivable-area and lane cues, and Depth Anything V2 a relative-depth field~\cite{dav2,hybridnets,ultralytics}. Weak or incomplete evidence may raise caution, for example from \st{Clear} to \st{Monitor}, but can never create object evidence or verify a driving action. The contributions are:
+\begin{itemize}
+\item an interpretable fusion architecture that relates YOLO11 object evidence to a HybridNets-based ego corridor and Depth Anything V2 relative depth, in which weak evidence can add caution but cannot justify a severe advisory;
+\item a multi-region object-depth reliability estimator that reports \st{Stable}, \st{Check}, or \st{Uncertain}, whose states are validated against BDD100K annotations;
+\item severity gates and a depth-only corridor fallback, measured with ground-truth ego-lane occupancy, and an operating curve that makes the cost of conservatism explicit;
+\item a reproducible evaluation on 9{,}500 BDD100K validation images and a deterministic hard set, with released image IDs, cached-replay ablations, and image-level confidence intervals.
+\end{itemize}
+
+\section{Related Work}
+\emph{Road-scene perception.} BDD100K covers diverse weather, lighting, and road conditions~\cite{bdd100k}. YOLO-family detectors are widely used for traffic objects~\cite{ultralytics,yolo}, but a box does not say whether an object occupies the ego path; multi-task networks such as YOLOP and HybridNets add drivable-area and lane context~\cite{hybridnets,yolop}.
+
+\emph{Depth and uncertainty.} MiDaS and Depth Anything predict affine-invariant relative depth that orders a scene well but lacks metric scale~\cite{dav2,midas,dav1}. Neural confidence can be poorly calibrated~\cite{guo2017}; Bayesian modeling, deep ensembles, and depth-specific estimators address uncertainty inside the network~\cite{kendall2017,ensembles,poggi2020,hornauer2022}. This work instead operates at the fusion level, on frozen models, and expresses uncertainty through agreement between independent evidence sources.
+
+\emph{Selective prediction and monitoring.} Selective classification abstains when confidence is insufficient and is judged by its risk--coverage trade-off~\cite{geifman2017}; conformal prediction provides distribution-free uncertainty sets~\cite{conformal}; run-time monitors flag unreliable perception outputs~\cite{rahman2021}; and probabilistic detection~\cite{feng2020} and adverse-weather studies~\cite{bijelic2020} motivate fail-aware perception. Our pipeline applies these ideas to multi-model static-image fusion and reports the trade-off between unsafe \st{Clear} outputs and over-caution.
+
+\section{Fail-Aware Fusion Method}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig_pipeline.pdf}
+\caption{Fail-aware fusion pipeline. Component outputs remain explicit until reliability and geometry gating; the depth-only fallback can only raise \st{Clear} to \st{Monitor}.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Complementary Evidence}
+The system combines three pretrained perception sources (Fig.~\ref{fig:pipeline}): YOLO11 object classes, confidences, boxes, and instance masks~\cite{ultralytics}; HybridNets drivable-area and lane masks, used to estimate an internal ego corridor~\cite{hybridnets}; and a Depth Anything V2 relative-depth field~\cite{dav2}. No component is trained or fine-tuned for this work. Object evidence comes from the detector only: road and depth cues can change an advisory, but they never create an object or verify a driving action. Depth is used only as a relative cue, never as metric distance, speed, or time-to-collision. Uncertainty is handled asymmetrically: weak evidence lowers the confidences below and can add caution (the fallback turns \st{Clear} into \st{Monitor}), but the gates of Sec.~\ref{sec:advisory} keep it from justifying \st{Brake} or \st{Stop}.
+
+\subsection{Scene and Object-Depth Reliability}
+Scene quality is estimated from the gray image: median illumination $m$, the 10--90 percentile range $R$, and the Laplacian variance $v$. With $q_{\mathrm{illum}}=\mathrm{clip}((m-18)/72)$, $q_{\mathrm{contrast}}=\mathrm{clip}((R-20)/80)$, and $q_{\mathrm{sharp}}$ the log-scaled variance between 12 and 500, all clipped to $[0,1]$, \mbox{$q_s = 0.40\,q_{\mathrm{illum}} + 0.30\,q_{\mathrm{contrast}} + 0.30\,q_{\mathrm{sharp}}$}. Low light ($m<45$), low contrast ($R<55$), blur ($v<60$), and glare are kept as separate flags; a scene is \st{Degraded} when $q_s<0.35$ or it is both dark and blurred, and \st{Limited} when $q_s<0.58$ or any flag is raised.
+
+Depth Anything V2 outputs an affine-invariant inverse-depth response $d$ in which larger values are nearer~\cite{dav2,midas}. The pipeline converts it into a relative depth index \mbox{$u=\mathrm{clip}(1000/d,\,0.1,\,999)$}, so that a \emph{smaller} $u$ means a \emph{nearer} surface. Because $d$ has an unknown scale and shift, $u$ preserves only the within-image ordering; it is not a distance and is never compared across images.
+
+For each accepted object, $u$ is sampled in three regions of the eroded instance mask: a center region, a lower-body region, and an inner-core region (Fig.~\ref{fig:regions}). Let $u_r$ be the trimmed (12--88 percentile) median in region $r$ and $n_r$ its number of retained pixels. The object estimate is the support-weighted geometric mean $u_o=\exp(\sum_r w_r\log u_r/\sum_r w_r)$ with $w_r=\min(n_r,300)$, and regional consistency is measured by the disagreement ratio $a=\max_r u_r/\min_r u_r$. With $s$ the 20--80 interquantile spread of all sampled values normalized by $u_o$ and $N$ the number of retained pixels, the base reliability is
+\begin{equation}
+c_u = \mathrm{clip}(1.35/a,0,1)\, e^{-0.85 s}\, \mathrm{clip}(N/120,\,0.25,\,1),
+\label{eq:cu}
+\end{equation}
+which is then multiplied by a mask-quality factor $\mathrm{clip}(0.45+0.75\,m_q,\,0.35,\,1)$ (where $m_q$ penalizes nearly empty or box-like masks), by $0.58$ when only a box is available, and by $0.72$ or $0.82$ for objects truncated by the side/top or bottom image border. The estimate is \st{Stable} when $c_u \ge 0.68$ and $a \le 1.35$, \st{Check} when $c_u \ge 0.35$ and $a \le 1.80$, and \st{Uncertain} otherwise. The constants were fixed during development, before the evaluation reported here; Section~\ref{sec:sensitivity} reports their sensitivity.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig_regions.pdf}
+\caption{Multi-region depth sampling. Left: the three regions of a vehicle agree, so the estimate is \st{Stable}. Right: the mask leaks into the background, the regions disagree, and the estimate is kept at \st{Check}.}
+\label{fig:regions}
+\end{figure}
+
+\subsection{Path Relation and Conservative Advisory}
+\label{sec:advisory}
+The ego corridor is a perspective band that starts at 35\% of the image height and widens toward the bottom; its center and width follow the HybridNets lane pixels in the rows where both lane boundaries are visible and keep the default trapezoid elsewhere. An object is \st{Path} when its ground-contact point lies inside the corridor or at least 10\% of the lower 30\% of its mask overlaps it, \st{Edge} when it overlaps a dilated corridor, and \st{Side} otherwise.
+
+A risk score combines the relative depth index, image area, bottom position, path relation ($+32$ for \st{Path}, $+15$ for \st{Edge}), and a vulnerable-road-user bonus, and is mapped to \st{Clear}, \st{Monitor}, \st{Slow}, \st{Brake}, or \st{Stop} at the cut-offs 24, 40, 60, and 78. The evidence confidence combines detector confidence $c_{\mathrm{det}}$, depth reliability $c_u$, a distance-agreement score $c_d$, and scene quality:
+\begin{equation}
+c_e=\sqrt{c_{\mathrm{det}}\,\max(c_u,c_d)}\;(0.65+0.35\,q_s).
+\label{eq:ce}
+\end{equation}
+Here $c_d$ measures the agreement of up to three monocular distance cues (depth fitted to the road plane, ground-contact geometry, and class-height priors) under default camera assumptions (1.5\,m height, 70$^\circ$ field of view). It is used only as an agreement score inside~\eqref{eq:ce} and the weak-evidence gates; no metric distance is reported.
+
+Severity gates then cap unsupported outputs and can only lower an advisory: (i)~a \st{Side} object raises at most \st{Monitor}, or \st{Slow} for a close vulnerable road user at the image bottom; (ii)~an \st{Edge} object raises at most \st{Brake}; (iii)~\st{Stop} requires a \st{Stable}, very near \st{Path} object ($u_o\le4$ with $c_u\ge0.60$, at least 2.5\% of the image area, and its lower edge in the bottom 32\% of the image, or a distance cue of at most 4\,m with $c_d\ge0.55$) with $c_{\mathrm{det}}\ge0.55$ and $c_e\ge0.48$; (iv)~\st{Brake} requires a credible size or position, $c_{\mathrm{det}}\ge0.30$, and $c_e\ge0.28$; (v)~an \st{Uncertain} object with $c_{\mathrm{det}}<0.35$ raises at most \st{Monitor}; and (vi)~in a degraded scene ($q_s<0.35$), \st{Brake} also requires a \st{Stable} object with $c_{\mathrm{det}}\ge0.45$. A failed gate lowers the advisory by one level.
+
+\subsection{Depth-Only Corridor Fallback and Audit Record}
+Detector-empty images should not automatically be treated as safe. The corridor is divided into far, middle, and near bands, and the median $u$ of road pixels in each band is checked for the expected monotonic order. The corridor state is \st{Unavailable} when fewer than 55\% of the band pixels are valid or a band is missing, \st{Limited} when the scene is degraded or the band confidence is below 0.38, \st{Check} when the ordering is violated, and \st{Consistent} otherwise. When no object is accepted and the state is not \st{Consistent}, the global advisory is raised from \st{Clear} to \st{Monitor}. The fallback never creates an object, a location, or a distance.
+
+The output is the global advisory plus one audit record per accepted object (class, confidences, mask source, $u_o$, reliability state, path relation, risk score, and advisory), so every advisory can be traced to its evidence. A \st{Stable} state indicates regional agreement, not ground-truth correctness.
+
+\section{Experimental Protocol}
+\subsection{Models and Inference Profile}
+YOLO11x-seg (COCO-pretrained) runs at 960\,px with a confidence threshold of 0.15 and four test-time passes (raw and scene-adaptively enhanced input, each with a horizontal flip) fused by weighted box fusion; single-pass detections below 0.34 are rejected. Enhancement (gamma, luma CLAHE, mild unsharp masking) is applied to the YOLO input only, when the scene flags call for it. HybridNets-D3 runs at 640\,px and Depth Anything V2 ViT-L at 518\,px. All thresholds and fusion rules are fixed across every evaluation; the code is commit \texttt{\CodeCommit}, and the weight checksums are listed in the repository.
+
+\subsection{Evaluation Data}
+All headline experiments use the 10{,}000 BDD100K validation images~\cite{bdd100k}, whose labels none of the three networks was trained on. A random 500-image \emph{dev} subset (seed \SplitSeed) is used only for threshold sensitivity, the operating curve, and the dataset-average priors of the ablations. The remaining 9{,}500 images form the \emph{test} split on which every headline number is computed (ID-list SHA-256 prefix \texttt{\TestIDsHash}). The \emph{hard} set is a deterministic stress subset of the test split: all validation images are measured at $320\times180$ (mean brightness $b$, standard deviation $c$, Laplacian variance $l$, dark and bright pixel fractions $f_d$ ($\le35$) and $f_b$ ($\ge245$), Canny-edge density $e$), each normalized between its 2nd and 98th percentiles; the category scores are $0.65f_d+0.35(1-b)$ (dark), $1-c$ (low contrast), $1-l$ (blur), $0.75f_b+0.25b$ (glare), and $e$ (complex), and each category in turn keeps its 20 highest-scoring images not already selected (prefix \texttt{\HardIDsHash}). Perturbation stability is also measured on a random 1{,}000-image subset of the test split (the \emph{1k subset})\ifdefined\OpValopImages, and the \OpValopImages{} test images outside the hard set and the 1k subset (\emph{val\_rest}) serve as a held-out check of the operating point chosen on the dev subset\fi.\ifdefined\TrainImages{} As a supplementary check, the same protocol is applied to the \TrainImages{} annotated BDD100K \emph{train} images (labels from public copies that reproduce all 10{,}000 validation labels and masks exactly); HybridNets was trained on them, so they are reported separately.\fi
+
+\subsection{Ground-Truth Protocol}
+BDD100K validation annotations provide boxes with occlusion and truncation flags, time-of-day and weather tags, and drivable-area maps that separate the \emph{direct} (ego) lane from \emph{alternative} lanes~\cite{bdd100k}. A \emph{road user} is any annotated person, rider, or vehicle; it is \emph{relevant} when its box is at least 5\% of the image height (36\,px, roughly within 40\,m for a car). Its ground-truth lane is the drivable label under a ground-contact strip just below the box (direct or alternative when those labels cover at least a quarter of the strip). Detections are matched class-agnostically to road users at IoU $\ge 0.5$. An image is \emph{occupied} when a relevant road user stands in the direct lane. An \emph{unsafe \st{Clear}} is a \st{Clear} advisory on an occupied image; \emph{over-caution} is \st{Slow} or higher when no road user of any size is in the direct lane (an upper bound: an adjacent-lane hazard can justify such advisories); and a \st{Brake}/\st{Stop} advisory is \emph{unsupported} when none of the objects that raised it is a true positive in the direct or alternative lane. These definitions were fixed before any result was inspected.
+
+\subsection{Ablations, Replays, and Statistics}
+Each ablation re-runs only the fusion stage on identical network outputs, so all comparisons are paired; replaying the published constants reproduces the original reports byte for byte. The cumulative baselines are B0, YOLO with dataset-average road and depth priors from the dev subset; B1, which adds the HybridNets corridor; B2, which adds Depth Anything V2 sampled in the center region only; and B3, which adds the multi-region reliability and scene quality. The full system adds the severity gates and the fallback. Stability is measured under six mild perturbations (darker and brighter gamma, 0.7 contrast, Gaussian blur with $\sigma=1.5$, Gaussian noise with $\sigma=8$, and JPEG quality 35). Proportions use Wilson intervals~\cite{wilson1927}; object-level ratios use an image-level cluster bootstrap with 10{,}000 resamples~\cite{efron1993}, because detections in one image are not independent; and paired image-level outcomes use the exact McNemar test~\cite{mcnemar1947}.\ifdefined\TestTFourImages{} Inference for \TestTFourImages{} test images and every perturbation run of the 1k subset ran on an NVIDIA T4 with the same pinned library versions; perturbed images are always compared with clean runs from the same GPU.\fi
+
+\section{Results}
+\input{tables/overall}
+
+\subsection{Internal Reliability and Detection Correctness}
+Table~\ref{tab:overall} summarizes the test split and the hard set. On the test split, \TestStable{} of \TestAccepted{} accepted detections are \st{Stable} (\TestStablePct\%, image-bootstrap CI \TestStableBootLow--\TestStableBootHigh\%); on the hard set the ratio is \HardStablePct\% (Wilson CI \HardStableLow--\HardStableHigh\%), close to the 86.1\% of the submitted version.\footnote{The submitted version reported 596 detections on a hard set whose image list was not preserved; every number here comes from the regenerated, published splits.} Against the annotations, the accepted test detections reach \TestPrec\% precision and \TestRecRel\% recall of relevant road users; relative to the raw YOLO ensemble (\TestRawPrec\% precision, \TestRawRecRel\% recall), the fusion-level suppression trades a little recall for precision.
+
+\input{tables/states_test}
+
+\subsection{Do Reliability States Mean Anything?}
+Table~\ref{tab:states_test} relates the reliability states to the annotations. Non-\st{Stable} test estimates are false positives in \TestFPNonStable\% of cases (CI \TestFPNonStableLow--\TestFPNonStableHigh\%) against \TestFPStable\% for \st{Stable} ones (CI \TestFPStableLow--\TestFPStableHigh\%), a factor of \TestFPRatio. \st{Check} concentrates on objects truncated by the image border (\TestTruncCheck\% vs.\ \TestTruncStable\%), exactly the case where regional depth samples cannot agree. The states are thus informative about correctness, although \st{Stable} remains an agreement measure, not a depth-accuracy guarantee.
+
+\subsection{Advisories, Path Relation, and the Cost of Conservatism}
+Unsafe \st{Clear} occurs on \TestUnsafe{} of \TestOccupied{} occupied test images (Wilson upper bound \TestUnsafeHigh\%) and on \HardUnsafe{} of \HardOccupied{} occupied hard-set images.\ifdefined\TestUnsafeDetected{} In \TestUnsafeDetected{} of the \TestUnsafe{} test cases the in-lane road user was detected, but the corridor classified it as \st{Side}, which caps its advisory; in the other \TestUnsafeMissed{} the detector missed it (\TestUnsafeMissedNight{} at night)\ifdefined\TrainUnsafeDetected{}; the \TrainUnsafe{} train cases split the same way (\TrainUnsafeDetected{} and \TrainUnsafeMissed{})\fi.\fi{} This has a cost: only \TestClearPct\% of test images receive \st{Clear} and \TestSeverePct\% receive \st{Brake} or \st{Stop}, over-caution affects \TestOver{} of \TestFree{} free-lane images, and \TestUnsupportedPct\% of \st{Brake}/\st{Stop} advisories are unsupported by an in-lane object. The main cause is the ego corridor. Matched \st{Path} precision is only \TestPathPrec\% (recall \TestPathRec\%) because the perspective band is wider than the true ego lane near the vanishing point, so roadside and distant road users are labeled \st{Path} (\TestPathOff{} of the \TestPathPrecN{} matched \st{Path} objects stand outside the annotated drivable area). The corridor overlaps the annotated ego lane with IoU \TestCorridorIoU, although the HybridNets road mask itself matches the annotated drivable area with IoU \TestRoadIoU. Part of the disagreement is annotation: on unmarked streets the BDD100K direct lane often spans the whole carriageway. Fig.~\ref{fig:qualitative} shows both behaviors, and Fig.~\ref{fig:operating} places the published cut-offs on the trade-off between unsafe \st{Clear} and over-caution. On the dev subset, the cut-offs can be relaxed up to $\times$\OpDevSafeScale{} before the first unsafe \st{Clear}, which lowers over-caution from \OpDevBaseOverPct\% to \OpDevSafeOverPct\%\ifextended{} (at $\times$\OpDevMaxScale{} it falls to \OpDevMaxOverPct\% while \OpDevMaxUnsafePct\% of occupied images receive \st{Clear})\fi; \ifdefined\OpValopChosenUnsafe on the \OpValopImages{} held-out val\_rest images the same relaxation raises unsafe \st{Clear} from \OpValopBaseUnsafe{} to \OpValopChosenUnsafe{} of \OpValopOccupied{} occupied images (\OpValopBaseUnsafePct\% to \OpValopChosenUnsafePct\%, upper bound \OpValopChosenUnsafeHigh\%) while over-caution falls from \OpValopBaseOverPct\% to \OpValopChosenOverPct\%\ifextended\ifdefined\OpTrainChosenUnsafe{}, and on the \OpTrainImages{} train images unsafe \st{Clear} moves from \OpTrainBaseUnsafePct\% to \OpTrainChosenUnsafePct\% and over-caution from \OpTrainBaseOverPct\% to \OpTrainChosenOverPct\%\fi\fi. A margin chosen on the \DevImages{} dev images therefore does not transfer, and the published cut-offs are kept.\else on the 1k test subset the same relaxation changes unsafe \st{Clear} from \OpStdBaseUnsafe{} to \OpStdAtSafeUnsafe{} of \OpStdOccupied{} occupied images.\fi
+
+\begin{figure*}[t]
+\centering
+\ifextended
+\includegraphics[width=\textwidth]{figures/fig_qualitative.pdf}
+\caption{Hard-set cases selected by fixed rules: three intended behaviors (a--c) and three failure modes or annotation disagreements (d--f). Colored boxes are system outputs labeled by path relation (\st{Check} marks a depth estimate that is not \st{Stable}; small boxes are unlabeled); white boxes are BDD100K annotations; the green tint is the annotated ego lane.}
+\else
+\includegraphics[width=\textwidth]{figures/fig_qualitative_main.pdf}
+\caption{Hard-set cases selected by fixed rules, drawn with the system's overlay: (a)~the taxi and truck ahead are \st{Path} and raise \st{Brake}; (b)~in a degraded night scene the gates cap \st{Stop} at \st{Brake}; (c)~failure: cars parked at the curb fall inside the corridor and are labeled \st{Path}. Every box is labeled with class, detector confidence, path relation, and relative depth index~$u$, followed by \st{Check} when the depth is not \st{Stable}; box and label color: advisory of that object (blue \st{Monitor}, yellow \st{Slow}, orange \st{Brake}); green: HybridNets road, yellow: lanes.}
+\fi
+\label{fig:qualitative}
+\end{figure*}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig_operating.pdf}
+\caption{Operating curve: all advisory cut-offs scaled together (dev subset: $\times0.5$ to $\times2.5$\ifdefined\OpValopImages; held-out val\_rest\ifdefined\OpTrainImages{} and train split\fi: $\times0.8$ to $\times2.0$\fi; circled points: published constants).}
+\label{fig:operating}
+\end{figure}
+
+\input{tables/buildup_test}
+
+\subsection{Ablations}
+\label{sec:ablations}
+Table~\ref{tab:buildup_test} builds the system up from YOLO alone on the test split, and leave-one-out replays isolate each component on identical network outputs. Against the YOLO-only baseline B0, the full system is less over-cautious (\TestOverPct\% vs.\ \TestBZeroOverPct\%, $p\TestBZeroOverP$) with no more unsafe \st{Clear} (\TestUnsafe{} vs.\ \TestBZeroUnsafe). The severity gates mainly control the aggressive outputs: removing them changes \st{Stop} advisories from \TestStop{} to \TestNoGatesStop{}, over-caution from \TestOver{} to \TestNoGatesOver{} images (McNemar $p\TestNoGatesOverP$), and unsupported \st{Brake}/\st{Stop} outputs from \TestUnsupported{} to \TestNoGatesUnsupported. The fallback fired on \TestFallback{} of the \TestEmpty{} detector-empty test images; without it, unsafe \st{Clear} changes from \TestUnsafe{} to \TestUnsafeNoFB{} ($p\TestNoFBUnsafeP$). Scene quality feeds the same mechanism: without it, the depth-only scan of degraded detector-empty images looks consistent, and \st{Clear} images change from \TestClear{} to \TestNoSQClear. Multi-region sampling mainly changes the reliability states (stable ratio \TestSingleStablePct\% with the center region alone vs.\ \TestStablePct\%) rather than the advisories (\TestSingleChanged{} changed images).
+
+The two dense sources contribute very differently. Replacing Depth Anything V2 with a dataset-average depth prior changes \TestNoDepthChanged{} test advisories and the stable ratio to \TestNoDepthStablePct\%, so per-image depth drives both the reliability states and the severity. Replacing HybridNets with an average road prior changes only \TestNoHybChanged{} advisories, because the corridor follows the lanes only where both boundaries are visible: on average only \TestLaneGuidedPct\% of corridor rows are lane-guided, and \TestMostlyTrapezoidPct\% of test images use the default trapezoid for more than three quarters of the corridor. HybridNets is therefore under-used rather than unreliable (Section~\ref{sec:discussion}).
+
+\ifextended\input{tables/groups}\else\input{tables/groups_test}\fi
+
+\subsection{Difficult Conditions}
+Table~\ref{tab:groups} reports \ifextended the hard-set categories and \fi the test split by time of day and weather. Relevant recall is \TestNightRecRel\% at night against \TestDayRecRel\% in daytime, while the stable ratio changes less (\TestNightStablePct\% vs.\ \TestDayStablePct\%): local object-depth agreement can survive darkness, whereas detector recall and scene quality do not. HybridNets remains a reliable road source at night (road IoU \TestNightRoadIoU{} vs.\ \TestDayRoadIoU{}). On the night images, replacing Depth Anything V2 changes \TestNoDepthNightChangedPct\% of the advisories (\TestNoDepthDayChangedPct\% by day) and replacing HybridNets \TestNoHybNightChangedPct\% (\TestNoHybDayChangedPct\%): depth matters equally in both conditions, the road cues about twice as much at night but still far less than depth. Weather is confounded with time of day (\TestWClearNightPct\% of the clear-weather test images are night images, against \TestWRainyNightPct\% of the rainy ones), so it is compared within each time of day: rain lowers relevant recall from \TestWClearDayRecRel\% to \TestWRainyDayRecRel\% by day and from \TestWClearNightRecRel\% to \TestWRainyNightRecRel\% at night (\TestWRainyImages{} rainy images), whereas snow hardly changes it (\TestWSnowyDayRecRel\% and \TestWSnowyNightRecRel\%; \TestWSnowyImages{} images). Fog is too rare in BDD100K (\TestWFoggyImages{} test images) to support any conclusion.\ifdefined\TrainWRainyNightRecRel{} The train split repeats this pattern on \TrainWRainyImages{} rainy and \TrainWSnowyImages{} snowy images (rain: \TrainWClearDayRecRel\% to \TrainWRainyDayRecRel\% by day, \TrainWClearNightRecRel\% to \TrainWRainyNightRecRel\% at night; snow: \TrainWSnowyDayRecRel\% and \TrainWSnowyNightRecRel\%), and fog remains too rare there (\TrainWFoggyImages{} images).\fi\ifextended\ifdefined\TrainNoHybUnsafe{} On the train images, on which HybridNets was trained (road IoU \TrainRoadIoU{} against \TestRoadIoU), unsafe \st{Clear} occurs on \TrainUnsafe{} of \TrainOccupied{} occupied images and over-caution on \TrainOverPct\% of free-lane images (\TrainNoHybUnsafe{} and \TrainNoHybOverPct\% with HybridNets replaced by the dev road prior).\fi\fi
+
+\subsection{Sensitivity, Stability, and Runtime}
+\label{sec:sensitivity}
+Changing each reliability constant by $\pm20\%$ on the dev subset mainly moves the stable ratio itself (by up to \SensRelStableDelta{} points, almost entirely through the \st{Stable} threshold), whereas the advisories move much less: the \st{Brake}/\st{Stop} rate changes by at most \SensRelSevereDelta{} points (when the \st{Stable} threshold is raised) and over-caution does not change. The advisory trade-off is governed by the risk cut-offs, which is why Fig.~\ref{fig:operating} sweeps them; no sensitivity setting produces an unsafe \st{Clear} on any of the \DevOccupied{} occupied dev images. Under the six mild perturbations, the advisory changes in \StdFlipFull\% of image pairs on the 1k subset and \FlipFull\% on the hard set, against \StdFlipNoGates\% and \FlipNoGates\% without gates; reliability states of persisting objects change in \StdStateFlipFull\% of cases. With the center region alone the flips are essentially unchanged (\StdFlipSingle\% and \FlipSingle\%) and the state changes rise slightly (\StdStateFlipSingle\%): the multi-region check stabilizes the states, not the advisories.\ifdefined\CrossHWFlipFull{} Hardware matters far less: rerunning the clean 1k subset on the T4 instead of the RTX~3050 changes none of its \CrossHWFlipPairsFull{} advisories\ifdefined\CrossHWValFlips{} and \CrossHWValFlips{} of the \CrossHWValPairs{} val\_rest advisories computed on both GPUs\fi.\fi{} On an RTX~3050 laptop GPU the median latency is \LatTotal\,s per image (HybridNets \LatHyb\,s, Depth Anything V2 \LatDepth\,s, four-pass YOLO11x \LatYolo\,s; peak memory \LatVRAM\,GB)\ifdefined\LatTFourTotal{} and \LatTFourTotal\,s on an NVIDIA T4 (\LatTFourImages{} images)\fi, so this configuration is an offline analysis tool, not a real-time module.
+
+\section{Discussion and Limitations}
+\label{sec:discussion}
+The ground truth supports the fail-aware design where it matters for safety, and shows that the published operating point is conservative in the expensive direction, because a fixed perspective corridor over-assigns roadside and distant objects to the ego path\ifdefined\TestUnsafeDetected{} and, in about half of the unsafe \st{Clear} cases, places a detected in-lane object beside it\fi. The ablations point to a remedy: HybridNets segments the drivable area well, but the corridor rarely uses it. In an exploratory replay that is \emph{not} part of the evaluated method, intersecting the corridor with the dilated HybridNets drivable mask changes matched \st{Path} precision from \TestPathPrec\% to \TestExpPathPrec\% and recall from \TestPathRec\% to \TestExpPathRec\%, and over-caution from \TestOver{} to \TestExpOver{} images, with \TestExpUnsafe{} unsafe \st{Clear}. A corridor that follows the drivable area therefore trades some path recall for less over-caution.
+
+The study has further limitations. Static images cannot show ego speed, object velocity, time-to-collision, or temporal consistency. The ground-truth lane relation is approximated from drivable-area maps, the relevance threshold is a size proxy for distance, and severe weather is under-represented. Depth Anything was trained with unlabeled image collections that include BDD100K imagery~\cite{dav1}, so the depth branch may be favored on this dataset. The four-pass configuration is far from real time. Future work should use the drivable mask in the corridor, calibrated distance targets, video-based temporal evaluation, and human rating of the advisories.
+
+\section{Conclusion}
+This paper presented a fail-aware fusion layer for conservative road-hazard assessment from a single front-facing image, which combines YOLO11, HybridNets, and Depth Anything V2 evidence while preserving uncertainty through scene quality, multi-region depth reliability, path reasoning, severity gates, and a depth-only fallback. On 9{,}500 BDD100K validation images and a reproducible hard set, the reliability states align with annotated false positives and truncation, and unsafe \st{Clear} advisories are rare (\TestUnsafe{} of \TestOccupied{} occupied images); the measured price is frequent over-caution caused by an over-inclusive ego corridor. The released code, image-ID manifests, and cached-replay protocol allow every number to be regenerated: \RepoURL.
+
+\ifextended
+\appendix
+\section*{Supplementary Results}
+\input{tables/loo_test}
+\IfFileExists{tables/train_check.tex}{\input{tables/train_check}}{}
+\input{tables/stability}
+\input{tables/sensitivity}
+\input{tables/buildup_hard}
+\input{tables/states_hard}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig_sensitivity.pdf}
+\caption{Sensitivity on the dev subset: each fusion constant is changed by $\pm20\%$ (the risk cut-offs are scaled together). Vertical rules mark the published constants.}
+\label{fig:sensitivity}
+\end{figure}
+\fi
+
+% Balances the two columns of the last page (main version only); adjust the number if the text length changes.
+\begin{thebibliography}{99}
+\bibitem{bdd100k} F. Yu \emph{et al.}, ``BDD100K: A diverse driving dataset for heterogeneous multitask learning,'' in \emph{Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)}, 2020, pp. 2636--2645.
+\bibitem{dav2} L. Yang, B. Kang, Z. Huang, Z. Zhao, X. Xu, J. Feng, and H. Zhao, ``Depth Anything V2,'' arXiv preprint arXiv:2406.09414, 2024.
+\bibitem{geifman2017} Y. Geifman and R. El-Yaniv, ``Selective classification for deep neural networks,'' in \emph{Proc. Advances in Neural Information Processing Systems (NeurIPS)}, 2017.
+\bibitem{rahman2021} Q. M. Rahman, P. Corke, and N. S\"underhauf, ``Run-time monitoring of machine learning for robotic perception: A survey of emerging trends,'' \emph{IEEE Access}, vol. 9, pp. 20067--20075, 2021.
+\bibitem{hybridnets} D. Vu, B. Ngo, and H. Phan, ``HybridNets: End-to-end perception network,'' arXiv preprint arXiv:2203.09035, 2022.
+\bibitem{ultralytics} Ultralytics, ``Ultralytics YOLO documentation.'' [Online]. Available: https://docs.ultralytics.com/. Accessed: Jun. 13, 2026.
+\bibitem{yolo} J. Redmon, S. Divvala, R. Girshick, and A. Farhadi, ``You only look once: Unified, real-time object detection,'' in \emph{Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)}, 2016, pp. 779--788.
+\bibitem{yolop} D. Wu, M.-W. Liao, W.-T. Zhang, X.-G. Wang, X. Bai, W.-Q. Cheng, and W.-Y. Liu, ``YOLOP: You only look once for panoptic driving perception,'' \emph{Machine Intelligence Research}, vol. 19, no. 6, pp. 550--562, 2022.
+\bibitem{midas} R. Ranftl, K. Lasinger, D. Hafner, K. Schindler, and V. Koltun, ``Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer,'' \emph{IEEE Trans. Pattern Analysis and Machine Intelligence}, vol. 44, no. 3, pp. 1623--1637, 2022.
+\bibitem{dav1} L. Yang, B. Kang, Z. Huang, X. Xu, J. Feng, and H. Zhao, ``Depth Anything: Unleashing the power of large-scale unlabeled data,'' in \emph{Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)}, 2024.
+\bibitem{guo2017} C. Guo, G. Pleiss, Y. Sun, and K. Q. Weinberger, ``On calibration of modern neural networks,'' in \emph{Proc. 34th Int. Conf. Machine Learning (ICML)}, 2017, pp. 1321--1330.
+\bibitem{kendall2017} A. Kendall and Y. Gal, ``What uncertainties do we need in Bayesian deep learning for computer vision?'' in \emph{Proc. Advances in Neural Information Processing Systems (NeurIPS)}, 2017.
+\bibitem{ensembles} B. Lakshminarayanan, A. Pritzel, and C. Blundell, ``Simple and scalable predictive uncertainty estimation using deep ensembles,'' in \emph{Proc. Advances in Neural Information Processing Systems (NeurIPS)}, 2017.
+\bibitem{poggi2020} M. Poggi, F. Aleotti, F. Tosi, and S. Mattoccia, ``On the uncertainty of self-supervised monocular depth estimation,'' in \emph{Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)}, 2020.
+\bibitem{hornauer2022} J. Hornauer and V. Belagiannis, ``Gradient-based uncertainty for monocular depth estimation,'' arXiv preprint arXiv:2208.02005, 2022.
+\bibitem{conformal} A. N. Angelopoulos and S. Bates, ``A gentle introduction to conformal prediction and distribution-free uncertainty quantification,'' arXiv preprint arXiv:2107.07511, 2021.
+\bibitem{feng2020} D. Feng, A. Harakeh, S. L. Waslander, and K. Dietmayer, ``A review and comparative study on probabilistic object detection in autonomous driving,'' arXiv preprint arXiv:2011.10671, 2020.
+\bibitem{bijelic2020} M. Bijelic, T. Gruber, F. Mannan, F. Kraus, W. Ritter, K. Dietmayer, and F. Heide, ``Seeing through fog without seeing fog: Deep multimodal sensor fusion in unseen adverse weather,'' in \emph{Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)}, 2020.
+\bibitem{wilson1927} E. B. Wilson, ``Probable inference, the law of succession, and statistical inference,'' \emph{J. American Statistical Association}, vol. 22, no. 158, pp. 209--212, 1927.
+\bibitem{efron1993} B. Efron and R. J. Tibshirani, \emph{An Introduction to the Bootstrap}. New York, NY, USA: Chapman \& Hall, 1993.
+\bibitem{mcnemar1947} Q. McNemar, ``Note on the sampling error of the difference between correlated proportions or percentages,'' \emph{Psychometrika}, vol. 12, no. 2, pp. 153--157, 1947.
+\end{thebibliography}
+
+\end{document}
