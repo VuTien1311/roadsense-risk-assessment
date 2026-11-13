@@ -55,9 +55,12 @@ def _blend(image, mask, color, alpha):
         image[selected] = (image[selected] * (1.0 - alpha) + np.asarray(color, np.float32) * alpha).astype(np.uint8)
 
 
-def _object_label(det):
+def _object_label(det, compact=False):
     """(main text, depth text, depth is uncertain) for one fused detection."""
-    main = f"{det.get('class', 'object')} {float(det.get('confidence', 0.0)):.2f}  {det.get('corridor_relation', '')}".rstrip()
+    if compact:
+        main = f"{det.get('class', 'object')} {det.get('corridor_relation', '')}".rstrip()
+    else:
+        main = f"{det.get('class', 'object')} {float(det.get('confidence', 0.0)):.2f}  {det.get('corridor_relation', '')}".rstrip()
     unit = det.get("original_inverse_depth_unit")
     state = str(det.get("original_unit_status", "")).upper()
     mark = STATE_MARK.get(state, "?")
@@ -66,7 +69,8 @@ def _object_label(det):
 
 
 def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisory="CLEAR", advisory_confidence=None,
-                   critical=None, scene_quality=None, depth_scan=None):
+                   critical=None, scene_quality=None, depth_scan=None, text_scale=1.0, max_labels=FULL_LABEL_LIMIT,
+                   compact=False):
     """Draw the fused result on the input image (BGR uint8 in, BGR uint8 out, same size).
 
     detections: the per-object audit records of the report (class, confidence, box_xyxy,
@@ -74,6 +78,10 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
     Nothing is computed here: the overlay only shows what the fusion layer decided. ``u`` is the
     relative depth index (smaller = nearer within this image, never meters); ``?`` marks a depth
     estimate that is not STABLE.
+
+    text_scale, max_labels and compact only change the presentation (larger text and fewer labels for
+    a small printed figure; compact keeps the advisory card to the advisory and the scene state and
+    leaves the color legend to the figure caption).
     """
     frame = np.asarray(image)
     if frame.ndim != 3 or frame.shape[2] != 3 or frame.dtype != np.uint8 or 0 in frame.shape[:2]:
@@ -92,9 +100,9 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
     canvas = Image.fromarray(rgb).convert("RGBA")
     layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
-    label_font, tag_font = _font(15 * scale), _font(12 * scale)
-    pad, radius, stripe = int(round(5 * scale)), int(round(5 * scale)), max(3, int(round(4 * scale)))
-    line = max(2, int(round(2 * scale)))
+    label_font, tag_font = _font(15 * scale * text_scale), _font(12 * scale * text_scale)
+    pad, radius, stripe = int(round(5 * scale * text_scale)), int(round(5 * scale)), max(3, int(round(4 * scale * text_scale)))
+    line = max(2, int(round(2 * scale * max(1.0, text_scale * 0.75))))
 
     objects = []
     for det in detections or ():
@@ -120,22 +128,26 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
     # Header card: the global advisory and the evidence behind it.
     advisory = str(advisory).upper()
     advisory_color = ADVISORY_RGB.get(advisory, ADVISORY_RGB["CLEAR"])
-    big, small = _font(30 * scale), _font(14 * scale)
+    big, small = _font(30 * scale * text_scale), _font(14 * scale * text_scale)
     lines = []
-    if critical:
+    if compact:
+        if scene_quality:
+            lines.append((f"scene {scene_quality.get('status', '?')}", MUTED_RGB))
+    elif critical:
         lines.append((str(critical), TEXT_RGB))
     facts = []
-    if scene_quality:
+    if scene_quality and not compact:
         flags = ",".join(scene_quality.get("flags") or [])
         facts.append(f"Scene {scene_quality.get('status', '?')} {float(scene_quality.get('score', 0.0)):.2f}" + (f" ({flags})" if flags else ""))
     if advisory_confidence is not None:
         facts.append(f"Evidence {float(advisory_confidence):.2f}")
-    facts.append(f"Objects {len(objects)}")
-    lines.append(("   ".join(facts), MUTED_RGB))
-    if depth_scan and depth_scan.get("status"):
-        lines.append((f"Depth-only path {depth_scan['status']}", MUTED_RGB))
-    lines.append(("u = relative depth index (smaller = nearer, not meters)", MUTED_RGB))
-    margin, inner = int(round(12 * scale)), int(round(10 * scale))
+    if not compact:
+        facts.append(f"Objects {len(objects)}")
+        lines.append(("   ".join(facts), MUTED_RGB))
+        if depth_scan and depth_scan.get("status"):
+            lines.append((f"Depth-only path {depth_scan['status']}", MUTED_RGB))
+        lines.append(("u = relative depth index (smaller = nearer, not meters)", MUTED_RGB))
+    margin, inner = int(round(12 * scale)), int(round(10 * scale * text_scale))
     caption_w, caption_h, _ = _text_size(draw, "ADVISORY", small)
     word_w, word_h, word_top = _text_size(draw, advisory, big)
     sizes = [_text_size(draw, text, small) for text, _ in lines]
@@ -153,14 +165,17 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
         draw.text((text_x, text_y), text, font=small, fill=color + (255,))
         text_y += row
 
-    # Legend, bottom left.
+    # Legend, bottom left (left to the caption in compact mode).
     entries = [(name, ADVISORY_RGB[name]) for name in ADVISORY_ORDER] + [("road", ROAD_RGB), ("lane", LANE_RGB)]
     swatch = int(round(10 * scale))
     widths = [_text_size(draw, name, tag_font)[0] for name, _ in entries]
     legend_w = sum(widths) + len(entries) * (swatch + int(round(14 * scale))) + inner
     legend_h = int(round(22 * scale))
     legend = (margin, height - margin - legend_h, min(width - margin, margin + legend_w), height - margin)
-    draw.rounded_rectangle(legend, radius=radius, fill=CARD_RGBA)
+    if compact:
+        entries, legend = [], (0, 0, 0, 0)
+    else:
+        draw.rounded_rectangle(legend, radius=radius, fill=CARD_RGBA)
     cursor = legend[0] + inner
     for (name, color), text_w in zip(entries, widths):
         top = legend[1] + (legend_h - swatch) // 2
@@ -174,12 +189,12 @@ def render_overlay(image, road_mask=None, lane_mask=None, detections=(), advisor
     full = 0
     for item in ranked:
         x1, y1, x2, y2 = item["box"]
-        main, depth, uncertain = _object_label(item["det"])
+        main, depth, uncertain = _object_label(item["det"], compact)
         main_w, main_h, main_top = _text_size(draw, main + "  ", label_font)
         depth_w, depth_h, _ = _text_size(draw, depth, label_font)
         label_w, label_h = stripe + 2 * pad + main_w + depth_w, max(main_h, depth_h) + 2 * pad
         spot = None
-        if full < FULL_LABEL_LIMIT and (y2 - y1) >= 0.03 * height:
+        if full < max_labels and (y2 - y1) >= 0.03 * height:
             for left, top in ((x1, y1 - label_h - 2), (x1, y2 + 2), (x2 - label_w, y1 - label_h - 2), (x2 - label_w, y2 + 2), (x1 + line, y1 + line)):
                 left = min(max(left, 2), max(2, width - label_w - 2))
                 top = min(max(top, 2), max(2, height - label_h - 2))

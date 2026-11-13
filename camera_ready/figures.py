@@ -290,22 +290,41 @@ def fig_qualitative():
     save(fig, "fig_qualitative")
     (FIG / "fig_qualitative_cases.json").write_text(json.dumps(cases, indent=2), encoding="utf-8")
 
-    # Compact one-row version for the six-page paper: the cases named in COMPACT_CASES, re-lettered.
+    fig_overlay_cases(cases)
+
+
+# Six-page paper: three hard-set cases drawn with the system's own overlay (box color = the
+# advisory of that object, short labels), large enough to read in print. Letters of the six-panel
+# figure, title used in the paper.
+OVERLAY_CASES = (("a", "Dense street: taxi ahead in the path"), ("b", "Degraded night: gates cap STOP"),
+                 ("d", "Failure: parked car labeled PATH"))
+
+
+def fig_overlay_cases(cases):
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT))
+    from paper_visualization import render_overlay
+
     by_letter = {title[1]: key for title, key in cases}
-    compact = [(short, by_letter[letter]) for letter, short in COMPACT_CASES if letter in by_letter]
-    if len(compact) == len(COMPACT_CASES):
-        fig, axes = plt.subplots(1, len(compact), figsize=(7.16, 1.36))
-        for index, (ax, (short, key)) in enumerate(zip(axes, compact)):
-            draw_case(ax, f"({'abcdef'[index]}) {short}", key, gt_records)
-        fig.legend(handles=qualitative_legend(), loc="lower center", ncol=5, fontsize=6.3, bbox_to_anchor=(0.5, -0.02))
-        fig.tight_layout(rect=(0, 0.07, 1, 1), w_pad=0.3)
-        save(fig, "fig_qualitative_main")
-
-
-# Cases of the six-panel figure shown in the six-page paper (letter there, short title here; the
-# panels are narrower, so the long titles would collide).
-COMPACT_CASES = (("a", "Correct PATH objects"), ("c", "Fallback: MONITOR"),
-                 ("d", "Failure: parked car as PATH"), ("f", "Truncated object: CHECK"))
+    chosen = [(title, by_letter[letter]) for letter, title in OVERLAY_CASES if letter in by_letter]
+    if len(chosen) != len(OVERLAY_CASES):
+        print("[FIG] overlay cases skipped")
+        return
+    fig, axes = plt.subplots(1, len(chosen), figsize=(7.16, 1.52))
+    for index, (ax, (title, key)) in enumerate(zip(axes, chosen)):
+        report = load_report(key)
+        image = cv2.imread(str(VAL / f"{key}.jpg"))
+        masks = np.load(OUT / "cache" / "hybridnets" / f"{key}.npz")
+        overlay = render_overlay(image, masks["road"], masks["lane"], report["detections"], report["global_advisory"],
+                                 None, None, report["scene_quality"], None, text_scale=2.6, max_labels=3, compact=True)
+        ax.imshow(cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB))
+        ax.set_title(f"({'abc'[index]}) {title}", fontsize=7, color=INK, pad=2)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+    fig.tight_layout(pad=0.2, w_pad=0.35)
+    save(fig, "fig_qualitative_main", pdf_dpi=400)
 
 
 def qualitative_legend():
@@ -480,9 +499,11 @@ def fig_pipeline():
     save(fig, "fig_pipeline")
 
 
-def save(fig, name):
+def save(fig, name, pdf_dpi=None):
+    """pdf_dpi: resolution of embedded photographs in the PDF (matplotlib resamples images to the
+    save dpi, 100 by default, which blurs photos in print)."""
     FIG.mkdir(parents=True, exist_ok=True)
-    fig.savefig(FIG / f"{name}.pdf", bbox_inches="tight", pad_inches=0.02)
+    fig.savefig(FIG / f"{name}.pdf", bbox_inches="tight", pad_inches=0.02, **({"dpi": pdf_dpi} if pdf_dpi else {}))
     fig.savefig(FIG / f"{name}.png", dpi=300, bbox_inches="tight", pad_inches=0.02)
     plt.close(fig)
     print(f"[FIG] {name}")
